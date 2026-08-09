@@ -3,9 +3,7 @@ import { join } from "node:path";
 
 import type { RuleEntry, RuleSetting } from "./json-config.ts";
 
-export const oxclippyPresetNames = [
-  "recommended",
-  "all",
+export const individualOxclippyPresetNames = [
   "style",
   "complexity",
   "correctness",
@@ -15,7 +13,14 @@ export const oxclippyPresetNames = [
   "pedantic",
 ] as const;
 
+export const oxclippyPresetNames = [
+  "recommended",
+  "all",
+  ...individualOxclippyPresetNames,
+] as const;
+
 export type OxclippyPresetName = (typeof oxclippyPresetNames)[number];
+export type IndividualOxclippyPresetName = (typeof individualOxclippyPresetNames)[number];
 
 interface OxclippyPreset {
   rules: { [ruleName: string]: RuleSetting };

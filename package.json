@@ -1,14 +1,15 @@
 {
   "name": "oxray",
   "version": "0.1.0",
-  "description": "A fast, opinionated Oxlint and Oxfmt scaffolder",
+  "description": "Opinionated agent guardrails powered by Oxlint and Oxfmt",
   "keywords": [
+    "agents",
     "formatter",
+    "guardrails",
     "lint",
     "oxc",
     "oxfmt",
     "oxlint",
-    "scaffolder",
     "typescript"
   ],
   "homepage": "https://github.com/rayhanadev/oxray#readme",

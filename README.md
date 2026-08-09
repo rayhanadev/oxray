@@ -1,6 +1,6 @@
 # oxray
 
-A fast, opinionated [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) and [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) scaffolder with Ray's personal lint rules.
+Opinionated agent guardrails powered by [Oxlint](https://oxc.rs/docs/guide/usage/linter.html), [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html), and Ray's personal lint rules.
 
 ## Usage
 
@@ -17,9 +17,11 @@ Oxray detects Bun, npm, pnpm, or Yarn and then:
 - Adds `lint` and `format` package scripts.
 - Creates or safely updates `.oxlintrc.json` and `.oxfmtrc.json`.
 - Enables type-aware linting and the standard TypeScript, Unicorn, and Oxc plugins.
-- Lets you select one or more oxclippy presets.
+- Lets you choose the recommended or extensive (all) oxclippy ruleset, or select individual presets.
 - Enables import, package.json, and Tailwind CSS sorting in Oxfmt.
 - Enables the personal rules exported by the oxray plugin.
+- Creates `CLAUDE.md` as a pointer to `AGENTS.md`.
+- Preserves existing agent instructions and adds a rule forbidding lint suppression.
 
 Existing JSONC comments and unrelated configuration are preserved. Running oxray again with the same choices is safe and produces no additional config changes.
 
@@ -64,7 +66,7 @@ bun run lint
 bun run format -- --check
 ```
 
-The package builds `dist/cli.js` for the scaffolder and `dist/plugin.js` for Oxlint. Oxclippy rule implementations remain in [rayhanadev/oxclippy](https://github.com/rayhanadev/oxclippy); oxray only consumes its published presets.
+The package builds `dist/cli.js` for the guardrail installer and `dist/plugin.js` for Oxlint. Oxclippy rule implementations remain in [rayhanadev/oxclippy](https://github.com/rayhanadev/oxclippy); oxray only consumes its published presets.
 
 ## License
 

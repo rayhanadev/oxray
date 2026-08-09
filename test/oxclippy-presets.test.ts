@@ -1,6 +1,18 @@
 import { expect, test } from "bun:test";
 
-import { loadOxclippyRules } from "../src/oxclippy-presets.ts";
+import { individualOxclippyPresetNames, loadOxclippyRules } from "../src/oxclippy-presets.ts";
+
+test("lists only category presets for custom selection", () => {
+  expect(individualOxclippyPresetNames).toEqual([
+    "style",
+    "complexity",
+    "correctness",
+    "iterator",
+    "functions",
+    "principles",
+    "pedantic",
+  ]);
+});
 
 test("loads rule data from oxclippy's published preset export", () => {
   const rules = new Map(loadOxclippyRules(process.cwd(), ["style"]));

@@ -4,15 +4,19 @@ import { cancel, intro, isCancel, log, multiselect, outro, select, spinner } fro
 import { detectPackageManager, type PackageManagerName } from "nypm";
 
 import packageJson from "../package.json" with { type: "json" };
-import { oxclippyPresetNames, type OxclippyPresetName } from "./oxclippy-presets.ts";
+import { applyGuardrails, type PackageManagerSelection } from "./guardrails.ts";
+import {
+  individualOxclippyPresetNames,
+  type IndividualOxclippyPresetName,
+  type OxclippyPresetName,
+} from "./oxclippy-presets.ts";
 import { inferRuntime, inspectProject, type ProjectPackageJson, type Runtime } from "./project.ts";
-import { applyScaffold, type PackageManagerSelection } from "./scaffold.ts";
 
 const supportedPackageManagers = ["bun", "npm", "pnpm", "yarn"] as const;
 
-const presetDescriptions: { [preset in OxclippyPresetName]: string } = {
-  recommended: "All non-pedantic Clippy ports",
-  all: "Every oxclippy rule",
+type PresetSelection = "recommended" | "extensive" | "custom";
+
+const presetDescriptions: { [preset in IndividualOxclippyPresetName]: string } = {
   style: "Style simplifications",
   complexity: "Unnecessary complexity",
   correctness: "Likely bugs",
@@ -71,12 +75,34 @@ async function chooseRuntime(cwd: string, targetPackageJson: ProjectPackageJson)
 }
 
 async function choosePresets(): Promise<OxclippyPresetName[]> {
+  const selection = finishPrompt(
+    await select<PresetSelection>({
+      message: "Which oxclippy ruleset should be added?",
+      initialValue: "recommended",
+      options: [
+        {
+          hint: "All non-pedantic Clippy ports",
+          label: "recommended",
+          value: "recommended",
+        },
+        { hint: "Every oxclippy rule", label: "extensive", value: "extensive" },
+        { hint: "Choose individual presets", label: "custom", value: "custom" },
+      ],
+    }),
+  );
+
+  if (selection === "recommended") {
+    return ["recommended"];
+  }
+  if (selection === "extensive") {
+    return ["all"];
+  }
+
   return finishPrompt(
-    await multiselect<OxclippyPresetName>({
-      message: "Which oxclippy presets should be added?",
-      initialValues: ["recommended"],
+    await multiselect<IndividualOxclippyPresetName>({
+      message: "Which individual oxclippy presets should be added?",
       required: true,
-      options: oxclippyPresetNames.map((name) => ({
+      options: individualOxclippyPresetNames.map((name) => ({
         hint: presetDescriptions[name],
         label: name,
         value: name,
@@ -91,7 +117,7 @@ function printHelp(): void {
 Usage:
   oxray
 
-Scaffold Oxlint, Oxfmt, type-aware linting, oxclippy, and oxray rules in the current package.`);
+Install opinionated agent guardrails powered by Oxlint, Oxfmt, oxclippy, and oxray.`);
 }
 
 async function main(): Promise<void> {
@@ -114,7 +140,7 @@ async function main(): Promise<void> {
   const progress = spinner();
   progress.start("Installing tools and merging configuration");
   try {
-    await applyScaffold({ cwd, packageManager, presets, runtime });
+    await applyGuardrails({ cwd, packageManager, presets, runtime });
     progress.stop("Oxlint and Oxfmt are ready");
   } catch (error) {
     progress.error("Setup failed");
