@@ -46,13 +46,13 @@ describe("JSONC config merging", () => {
     expect(config.jsPlugins).toEqual([
       { name: "local", specifier: "./local.js" },
       "oxclippy",
-      "oxray",
+      { name: "rayhanadev", specifier: "@rayhanadev/ox" },
     ]);
     expect(config.categories.correctness).toBe("error");
     expect(config.options.typeAware).toBe(true);
     expect(config.rules["eslint/no-console"]).toBe("warn");
-    expect(config.rules["oxray/no-type-erasure"]).toBe("error");
-    expect(config.rules["oxray/no-typeof"]).toBe("error");
+    expect(config.rules["rayhanadev/no-type-erasure"]).toBe("error");
+    expect(config.rules["rayhanadev/no-typeof"]).toBe("error");
     expect(config.rules["oxclippy/needless-bool"]).toBe("warn");
     expect(config.rules["oxclippy/manual-clamp"]).toBe("error");
     expect(mergeOxlintConfig(merged, [])).toBe(merged);

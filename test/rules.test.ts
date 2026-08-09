@@ -14,13 +14,13 @@ beforeAll(async () => {
       {
         jsPlugins: [
           {
-            name: "oxray",
+            name: "rayhanadev",
             specifier: join(process.cwd(), "src/plugin.ts"),
           },
         ],
         rules: {
-          "oxray/no-type-erasure": "error",
-          "oxray/no-typeof": "error",
+          "rayhanadev/no-type-erasure": "error",
+          "rayhanadev/no-typeof": "error",
         },
       },
       null,
@@ -66,7 +66,7 @@ isUser(value);
 `);
 
     expect(result.exitCode).toBe(0);
-    expect(result.output).not.toContain("oxray(");
+    expect(result.output).not.toContain("rayhanadev(");
   });
 
   const invalidCases = [
@@ -89,7 +89,7 @@ isUser(value);
       const result = await lint(code);
 
       expect(result.exitCode).toBe(1);
-      expect(result.output).toContain("oxray(no-type-erasure)");
+      expect(result.output).toContain("rayhanadev(no-type-erasure)");
     });
   }
 });
@@ -99,7 +99,7 @@ describe("no-typeof", () => {
     const result = await lint("type Value = typeof value;");
 
     expect(result.exitCode).toBe(0);
-    expect(result.output).not.toContain("oxray(");
+    expect(result.output).not.toContain("rayhanadev(");
   });
 
   const invalidCases = [
@@ -113,7 +113,7 @@ describe("no-typeof", () => {
       const result = await lint(code);
 
       expect(result.exitCode).toBe(1);
-      expect(result.output).toContain("oxray(no-typeof)");
+      expect(result.output).toContain("rayhanadev(no-typeof)");
     });
   }
 });

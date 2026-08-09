@@ -56,7 +56,7 @@ describe("project guardrails", () => {
     await applyGuardrails(options, operations);
 
     expect(addedPackages[0]).toEqual([
-      "oxray@0.1.0",
+      "@rayhanadev/ox@0.1.0",
       "oxlint@latest",
       "oxfmt@latest",
       "oxlint-tsgolint@latest",
@@ -87,8 +87,11 @@ describe("project guardrails", () => {
       format: "oxfmt",
       lint: "oxlint",
     });
-    expect(oxlint.jsPlugins).toEqual(["oxclippy", "oxray"]);
-    expect(oxlint.rules["oxray/no-type-erasure"]).toBe("error");
+    expect(oxlint.jsPlugins).toEqual([
+      "oxclippy",
+      { name: "rayhanadev", specifier: "@rayhanadev/ox" },
+    ]);
+    expect(oxlint.rules["rayhanadev/no-type-erasure"]).toBe("error");
     expect(oxlint.rules["oxclippy/needless-bool"]).toBe("warn");
     expect(oxfmt.sortImports).toBe(true);
     expect(oxfmt.sortPackageJson).toBe(true);

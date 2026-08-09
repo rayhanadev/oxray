@@ -4,7 +4,7 @@ import noTypeof from "./rules/no-typeof.ts";
 
 const plugin = {
   meta: {
-    name: packageJson.name,
+    name: "rayhanadev",
     version: packageJson.version,
   },
   rules: {

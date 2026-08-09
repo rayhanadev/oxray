@@ -1,5 +1,5 @@
 {
-  "name": "oxray",
+  "name": "@rayhanadev/ox",
   "version": "0.1.0",
   "description": "Opinionated agent guardrails powered by Oxlint and Oxfmt",
   "keywords": [
@@ -22,7 +22,7 @@
     "url": "https://github.com/rayhanadev/oxray.git"
   },
   "bin": {
-    "oxray": "./dist/cli.js"
+    "ox": "./dist/cli.js"
   },
   "files": [
     "dist/cli.js",

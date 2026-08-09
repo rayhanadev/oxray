@@ -4,10 +4,17 @@ Opinionated agent guardrails for TypeScript projects, powered by [Oxlint](https:
 
 ## Quick start
 
-Run oxray from the directory containing your `package.json`:
+Run ox from the directory containing your `package.json`:
 
 ```bash
-bunx oxray
+bunx @rayhanadev/ox
+```
+
+Or install it in the project and run the `ox` command directly:
+
+```bash
+bun add --dev @rayhanadev/ox
+bunx ox
 ```
 
 Oxray also works with npm, pnpm, and Yarn projects. It detects the project's package manager and runtime before making changes.
@@ -16,7 +23,7 @@ Oxray also works with npm, pnpm, and Yarn projects. It detects the project's pac
 
 Oxray:
 
-- Installs Oxlint, Oxfmt, type-aware linting, oxclippy, oxray, and TypeScript 7.
+- Installs Oxlint, Oxfmt, type-aware linting, oxclippy, `@rayhanadev/ox`, and TypeScript 7.
 - Installs the matching Bun or Node.js type definitions.
 - Adds `lint` and `format` package scripts.
 - Creates or updates `.oxlintrc.json` and `.oxfmtrc.json` without replacing unrelated settings or JSONC comments.
@@ -24,7 +31,7 @@ Oxray:
 - Enables import, `package.json`, and Tailwind CSS sorting.
 - Adds shared agent instructions that forbid disabling or suppressing lint rules.
 
-Running oxray again with the same choices is safe and does not duplicate configuration.
+Running ox again with the same choices is safe and does not duplicate configuration.
 
 ## Oxclippy presets
 
@@ -52,7 +59,7 @@ You must never disable or suppress lint rules.
 
 ## Oxray rules
 
-### `oxray/no-type-erasure`
+### `rayhanadev/no-type-erasure`
 
 Disallows broad object patterns that discard useful type information:
 
@@ -63,7 +70,7 @@ Disallows broad object patterns that discard useful type information:
 
 Use concrete object shapes and domain-specific type guards instead.
 
-### `oxray/no-typeof`
+### `rayhanadev/no-typeof`
 
 Disallows runtime `typeof` expressions. TypeScript type queries such as `type Value = typeof value` are allowed.
 

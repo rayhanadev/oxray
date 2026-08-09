@@ -12,7 +12,7 @@
   },
   "jsPlugins": ["./src/plugin.ts"],
   "rules": {
-    "oxray/no-type-erasure": "error",
-    "oxray/no-typeof": "error"
+    "rayhanadev/no-type-erasure": "error",
+    "rayhanadev/no-typeof": "error"
   }
 }

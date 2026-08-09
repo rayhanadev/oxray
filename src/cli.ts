@@ -49,7 +49,7 @@ async function choosePackageManager(cwd: string): Promise<PackageManagerSelectio
 
   return finishPrompt(
     await select<PackageManagerName>({
-      message: "Which package manager should oxray use?",
+      message: "Which package manager should ox use?",
       initialValue: "bun",
       options: supportedPackageManagers.map((name) => ({ label: name, value: name })),
     }),
@@ -112,10 +112,10 @@ async function choosePresets(): Promise<OxclippyPresetName[]> {
 }
 
 function printHelp(): void {
-  console.log(`oxray ${packageJson.version}
+  console.log(`ox ${packageJson.version}
 
 Usage:
-  oxray
+  ox
 
 Install opinionated agent guardrails powered by Oxlint, Oxfmt, oxclippy, and oxray.`);
 }
@@ -132,7 +132,7 @@ async function main(): Promise<void> {
 
   const cwd = process.cwd();
   const { packageJson: targetPackageJson } = await inspectProject(cwd);
-  intro(`oxray v${packageJson.version}`);
+  intro(`ox v${packageJson.version}`);
 
   const packageManager = await choosePackageManager(cwd);
   const runtime = await chooseRuntime(cwd, targetPackageJson);

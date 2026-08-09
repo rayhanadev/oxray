@@ -47,7 +47,7 @@ export async function pathExists(path: string): Promise<boolean> {
 export async function inspectProject(cwd: string): Promise<Project> {
   const packageJsonPath = join(cwd, "package.json");
   if (!(await pathExists(packageJsonPath))) {
-    throw new Error("No package.json found. Run oxray from the package you want to configure.");
+    throw new Error("No package.json found. Run ox from the package you want to configure.");
   }
 
   const conflicts = [];

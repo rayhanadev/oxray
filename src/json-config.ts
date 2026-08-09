@@ -7,6 +7,8 @@ import {
   type ParseError,
 } from "jsonc-parser";
 
+import packageJson from "../package.json" with { type: "json" };
+
 export type RuleSetting = string | number | readonly [string | number, ...unknown[]];
 export type RuleEntry = readonly [name: string, setting: RuleSetting];
 
@@ -78,23 +80,35 @@ function appendStrings(
   return next;
 }
 
-function hasJsPlugin(plugins: Array<string | JsPlugin>, specifier: string): boolean {
+function hasJsPlugin(plugins: Array<string | JsPlugin>, required: string | JsPlugin): boolean {
   return plugins.some((plugin) => {
-    if (plugin === specifier) {
-      return true;
+    if (Object(required) !== required) {
+      const specifier = required as string;
+      if (plugin === specifier) {
+        return true;
+      }
+      if (plugin === null || Object(plugin) !== plugin) {
+        return false;
+      }
+      const entry = plugin as JsPlugin;
+      return (
+        entry.specifier === specifier && (entry.name === undefined || entry.name === specifier)
+      );
     }
+
     if (plugin === null || Object(plugin) !== plugin) {
       return false;
     }
     const entry = plugin as JsPlugin;
-    return entry.specifier === specifier && (entry.name === undefined || entry.name === specifier);
+    const requiredEntry = required as JsPlugin;
+    return entry.name === requiredEntry.name && entry.specifier === requiredEntry.specifier;
   });
 }
 
 function appendJsPlugins(
   text: string,
   existing: Array<string | JsPlugin> | undefined,
-  required: readonly string[],
+  required: ReadonlyArray<string | JsPlugin>,
 ): string {
   if (existing === undefined) {
     return setJsonValue(text, ["jsPlugins"], [...required]);
@@ -105,10 +119,10 @@ function appendJsPlugins(
 
   let next = text;
   let length = existing.length;
-  for (const specifier of required) {
-    if (!hasJsPlugin(existing, specifier)) {
-      next = setJsonValue(next, ["jsPlugins", length], specifier);
-      existing.push(specifier);
+  for (const plugin of required) {
+    if (!hasJsPlugin(existing, plugin)) {
+      next = setJsonValue(next, ["jsPlugins", length], plugin);
+      existing.push(plugin);
       length += 1;
     }
   }
@@ -129,13 +143,14 @@ export function mergeOxlintConfig(text: string, oxclippyRules: readonly RuleEntr
   if (config.$schema === undefined) {
     next = setJsonValue(next, ["$schema"], "./node_modules/oxlint/configuration_schema.json");
   }
+  const personalPlugin = { name: "rayhanadev", specifier: packageJson.name };
   next = appendStrings(next, "plugins", config.plugins, ["typescript", "unicorn", "oxc"]);
-  next = appendJsPlugins(next, config.jsPlugins, ["oxclippy", "oxray"]);
+  next = appendJsPlugins(next, config.jsPlugins, ["oxclippy", personalPlugin]);
   next = setJsonValue(next, ["categories", "correctness"], "error");
   next = setJsonValue(next, ["options", "typeAware"], true);
   next = setJsonValue(next, ["env", "builtin"], true);
-  next = setJsonValue(next, ["rules", "oxray/no-type-erasure"], "error");
-  next = setJsonValue(next, ["rules", "oxray/no-typeof"], "error");
+  next = setJsonValue(next, ["rules", "rayhanadev/no-type-erasure"], "error");
+  next = setJsonValue(next, ["rules", "rayhanadev/no-typeof"], "error");
 
   for (const [ruleName, setting] of oxclippyRules) {
     next = setJsonValue(next, ["rules", ruleName], setting);

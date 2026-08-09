@@ -119,7 +119,7 @@ export async function applyGuardrails(
 
   await operations.addDevDependency(
     [
-      `oxray@${packageJson.version}`,
+      `${packageJson.name}@${packageJson.version}`,
       "oxlint@latest",
       "oxfmt@latest",
       "oxlint-tsgolint@latest",
