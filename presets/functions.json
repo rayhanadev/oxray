@@ -1,9 +1,0 @@
-{
-  "rules": {
-    "oxclippy/too-many-arguments": "warn",
-    "oxclippy/too-many-lines": "warn",
-    "oxclippy/cognitive-complexity": "warn",
-    "oxclippy/excessive-nesting": "warn",
-    "oxclippy/fn-params-excessive-bools": "warn"
-  }
-}
