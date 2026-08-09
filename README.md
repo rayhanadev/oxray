@@ -1,31 +1,56 @@
 # oxray
 
-Opinionated agent guardrails powered by [Oxlint](https://oxc.rs/docs/guide/usage/linter.html), [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html), and Ray's personal lint rules.
+Opinionated agent guardrails for TypeScript projects, powered by [Oxlint](https://oxc.rs/docs/guide/usage/linter.html), [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html), [oxclippy](https://github.com/rayhanadev/oxclippy), and a small set of personal rules.
 
-## Usage
+## Quick start
 
-Run oxray from a package directory:
+Run oxray from the directory containing your `package.json`:
 
 ```bash
 bunx oxray
 ```
 
-Oxray detects Bun, npm, pnpm, or Yarn and then:
+Oxray also works with npm, pnpm, and Yarn projects. It detects the project's package manager and runtime before making changes.
 
-- Installs `oxray`, `oxlint`, `oxfmt`, `oxlint-tsgolint`, `oxclippy`, and TypeScript 7 as dev dependencies.
-- Adds the appropriate Bun or Node type definitions.
+## What it configures
+
+Oxray:
+
+- Installs Oxlint, Oxfmt, type-aware linting, oxclippy, oxray, and TypeScript 7.
+- Installs the matching Bun or Node.js type definitions.
 - Adds `lint` and `format` package scripts.
-- Creates or safely updates `.oxlintrc.json` and `.oxfmtrc.json`.
-- Enables type-aware linting and the standard TypeScript, Unicorn, and Oxc plugins.
-- Lets you choose the recommended or extensive (all) oxclippy ruleset, or select individual presets.
-- Enables import, package.json, and Tailwind CSS sorting in Oxfmt.
-- Enables the personal rules exported by the oxray plugin.
-- Creates `CLAUDE.md` as a pointer to `AGENTS.md`.
-- Preserves existing agent instructions and adds a rule forbidding lint suppression.
+- Creates or updates `.oxlintrc.json` and `.oxfmtrc.json` without replacing unrelated settings or JSONC comments.
+- Enables the TypeScript, Unicorn, and Oxc lint plugins.
+- Enables import, `package.json`, and Tailwind CSS sorting.
+- Adds shared agent instructions that forbid disabling or suppressing lint rules.
 
-Existing JSONC comments and unrelated configuration are preserved. Running oxray again with the same choices is safe and produces no additional config changes.
+Running oxray again with the same choices is safe and does not duplicate configuration.
 
-## Rules
+## Oxclippy presets
+
+Choose how much of oxclippy to enable during setup:
+
+- **Recommended** — all non-pedantic rules.
+- **Extensive** — every oxclippy rule.
+- **Custom** — choose from style, complexity, correctness, iterator, functions, principles, and pedantic presets.
+
+Oxclippy owns the reusable Clippy-inspired rules and presets. Oxray consumes them as one part of its personal guardrail setup.
+
+## Agent instructions
+
+Oxray makes `AGENTS.md` the shared source of project instructions and creates `CLAUDE.md` containing:
+
+```text
+See @AGENTS.md
+```
+
+Existing instructions are preserved. If only `CLAUDE.md` exists, it is migrated to `AGENTS.md`; if both files exist, their instructions are combined. Oxray then adds:
+
+```text
+You must never disable or suppress lint rules.
+```
+
+## Oxray rules
 
 ### `oxray/no-type-erasure`
 
@@ -40,33 +65,20 @@ Use concrete object shapes and domain-specific type guards instead.
 
 ### `oxray/no-typeof`
 
-Disallows every runtime `typeof` expression. TypeScript type queries such as `type Value = typeof value` are allowed.
+Disallows runtime `typeof` expressions. TypeScript type queries such as `type Value = typeof value` are allowed.
 
 ## Project detection
 
-Runtime detection uses existing type dependencies and project configuration. Ambiguous projects get an interactive Bun/Node prompt.
+Oxray infers Bun or Node.js from existing dependencies and project files. Ambiguous projects get an interactive prompt.
 
-For Node projects, the `@types/node` version follows fnm's local precedence:
+For Node.js projects, the `@types/node` version follows this precedence:
 
 1. `.node-version`
 2. `.nvmrc`
 3. `package.json#engines.node`
-4. The active fnm or Node version
+4. The active fnm or Node.js version
 
-Oxray intentionally aborts when TypeScript/JavaScript Oxlint or Oxfmt config files already exist; v0 writes and merges the JSON config variants only.
-
-## Development
-
-```bash
-bun install
-bun run build
-bun test
-bun run typecheck
-bun run lint
-bun run format -- --check
-```
-
-The package builds `dist/cli.js` for the guardrail installer and `dist/plugin.js` for Oxlint. Oxclippy rule implementations remain in [rayhanadev/oxclippy](https://github.com/rayhanadev/oxclippy); oxray only consumes its published presets.
+Oxray currently writes the JSON variants of the Oxlint and Oxfmt config files. It stops instead of competing with existing JavaScript, TypeScript, or JSONC config variants.
 
 ## License
 
