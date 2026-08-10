@@ -9,6 +9,7 @@ import {
   ensureAgentInstructions,
   type GuardrailOperations,
 } from "../src/guardrails.ts";
+import { personalRuleNames } from "../src/rule-names.ts";
 import { createTemporaryProjects } from "./temporary-projects.ts";
 
 const temporaryProjects = createTemporaryProjects(
@@ -91,7 +92,9 @@ describe("project guardrails", () => {
       "oxclippy",
       { name: "rayhanadev", specifier: "@rayhanadev/ox" },
     ]);
-    expect(oxlint.rules["rayhanadev/no-type-erasure"]).toBe("error");
+    for (const ruleName of personalRuleNames) {
+      expect(oxlint.rules[`rayhanadev/${ruleName}`]).toBe("error");
+    }
     expect(oxlint.rules["oxclippy/needless-bool"]).toBe("warn");
     expect(oxfmt.sortImports).toBe(true);
     expect(oxfmt.sortPackageJson).toBe(true);

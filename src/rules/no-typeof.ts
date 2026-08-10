@@ -1,3 +1,12 @@
+/**
+ * Detects runtime `typeof` expressions, because oxray projects should narrow values with
+ * domain-specific guards or schemas that preserve concrete type information instead of branching
+ * on primitive labels.
+ *
+ * Flags: `if (typeof value === "string") use(value);`
+ *
+ * Does not flag: `type Value = typeof value;` or `if (isUser(value)) use(value);`
+ */
 import type { OxlintRule } from "./types.ts";
 
 const noTypeof = {

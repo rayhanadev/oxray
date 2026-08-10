@@ -8,6 +8,7 @@ import {
 } from "jsonc-parser";
 
 import packageJson from "../package.json" with { type: "json" };
+import { personalRuleNames } from "./rule-names.ts";
 
 export type RuleSetting = string | number | readonly [string | number, ...unknown[]];
 export type RuleEntry = readonly [name: string, setting: RuleSetting];
@@ -149,8 +150,9 @@ export function mergeOxlintConfig(text: string, oxclippyRules: readonly RuleEntr
   next = setJsonValue(next, ["categories", "correctness"], "error");
   next = setJsonValue(next, ["options", "typeAware"], true);
   next = setJsonValue(next, ["env", "builtin"], true);
-  next = setJsonValue(next, ["rules", "rayhanadev/no-type-erasure"], "error");
-  next = setJsonValue(next, ["rules", "rayhanadev/no-typeof"], "error");
+  for (const ruleName of personalRuleNames) {
+    next = setJsonValue(next, ["rules", `rayhanadev/${ruleName}`], "error");
+  }
 
   for (const [ruleName, setting] of oxclippyRules) {
     next = setJsonValue(next, ["rules", ruleName], setting);

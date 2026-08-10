@@ -3,6 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { personalRuleNames } from "../src/rule-names.ts";
+
 let fixtureDirectory: string;
 let fixtureNumber = 0;
 
@@ -18,10 +20,9 @@ beforeAll(async () => {
             specifier: join(process.cwd(), "src/plugin.ts"),
           },
         ],
-        rules: {
-          "rayhanadev/no-type-erasure": "error",
-          "rayhanadev/no-typeof": "error",
-        },
+        rules: Object.fromEntries(
+          personalRuleNames.map((ruleName) => [`rayhanadev/${ruleName}`, "error"]),
+        ),
       },
       null,
       2,
@@ -116,4 +117,103 @@ describe("no-typeof", () => {
       expect(result.output).toContain("rayhanadev(no-typeof)");
     });
   }
+});
+
+describe("Zod 4 rules", () => {
+  const zodRuleNames = personalRuleNames.filter(
+    (ruleName) => ruleName !== "no-type-erasure" && ruleName !== "no-typeof",
+  );
+
+  test("reports the mined high-signal anti-patterns", async () => {
+    const result = await lint(`
+type User = { id: string };
+
+z.string().url();
+z.number().positive().int();
+z.object({ id: z.string() }).strict();
+z.string().optional().default("fallback");
+z.union([z.literal(1), z.literal(2)]);
+type Parsed = z.infer<typeof schema>;
+const annotated: z.ZodType<User> = z.object({ id: z.string() });
+function parseWith<T>(schema: z.ZodType<T>): T { return schema.parse(value); }
+schema.safeParse(JSON.parse(text));
+z.string().url().refine((value) => new URL(value).hostname.length > 0);
+z.strictObject({ a: z.string(), b: z.string() }).superRefine((value, ctx) => {
+  ctx.addIssue({ code: "custom", message: "a and b conflict" });
+});
+const refined = z.strictObject({ id: z.string() }).superRefine(() => {});
+z.strictObject({ ...refined.shape, name: z.string() });
+z.string().min(1).trim();
+z.record(z.string(), z.unknown());
+defineTool({ input: z.object({ pull_number: z.number() }) });
+`);
+
+    expect(result.exitCode).toBe(1);
+    for (const ruleName of zodRuleNames) {
+      expect(result.output).toContain(`rayhanadev(${ruleName})`);
+    }
+  });
+
+  test("accepts canonical forms and catalog exclusions", async () => {
+    const result = await lint(`
+type User = { id: string };
+
+z.url().max(2_048);
+z.int().positive();
+z.coerce.number().int();
+z.strictObject({ id: z.string() });
+z.string().default("fallback");
+z.literal([1, 2]);
+z.union([z.literal(1), z.literal("two")]);
+type Parsed = z.output<typeof schema>;
+const checked = z.object({ id: z.string() }) satisfies z.ZodType<User>;
+function parseWith<S extends z.ZodType>(schema: S): z.output<S> { return schema.parse(value); }
+try { schema.safeParse(JSON.parse(text)); } catch {}
+z.string().refine((value) => {
+  try { return new URL(value).hostname.length > 0; } catch { return false; }
+});
+try {
+  z.string().refine((value) => {
+    try { return JSON.parse(value) !== null; } catch { return false; }
+  });
+} catch {}
+z.strictObject({ a: z.string(), b: z.string() }).superRefine((value, ctx) => {
+  ctx.addIssue({ code: "custom", path: ["a"], message: "a and b conflict" });
+});
+z.string().superRefine((value, ctx) => {
+  ctx.addIssue({ code: "custom", message: "string-level issue" });
+});
+const plain = z.strictObject({ id: z.string() });
+z.strictObject({ ...plain.shape, name: z.string() });
+const stillRefined = z.strictObject({ id: z.string() }).superRefine(() => {});
+stillRefined.extend({ name: z.string() });
+z.string().trim().min(1);
+z.record(z.string(), z.string());
+const providerResponse = z.object({ count: z.number() });
+defineTool({
+  input: z.strictObject({
+    pull_number: z.int(),
+    price: z.number(),
+    nested: z.object({ price: z.number() }),
+  }),
+});
+function schemaFor<T>(): z.ZodType<T> { return value; }
+`);
+
+    expect(result.exitCode).toBe(0);
+    for (const ruleName of zodRuleNames) {
+      expect(result.output).not.toContain(`rayhanadev(${ruleName})`);
+    }
+  });
+
+  test("requires try/catch inside the refinement callback", async () => {
+    const result = await lint(`
+try {
+  z.string().refine((value) => new URL(value).hostname.length > 0);
+} catch {}
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(throwing-zod-refine)");
+  });
 });

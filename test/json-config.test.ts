@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { parse } from "jsonc-parser";
 
 import { mergeOxfmtConfig, mergeOxlintConfig, mergePackageJson } from "../src/json-config.ts";
+import { personalRuleNames } from "../src/rule-names.ts";
 
 describe("JSONC config merging", () => {
   test("adds scripts without replacing unrelated package metadata", () => {
@@ -51,8 +52,9 @@ describe("JSONC config merging", () => {
     expect(config.categories.correctness).toBe("error");
     expect(config.options.typeAware).toBe(true);
     expect(config.rules["eslint/no-console"]).toBe("warn");
-    expect(config.rules["rayhanadev/no-type-erasure"]).toBe("error");
-    expect(config.rules["rayhanadev/no-typeof"]).toBe("error");
+    for (const ruleName of personalRuleNames) {
+      expect(config.rules[`rayhanadev/${ruleName}`]).toBe("error");
+    }
     expect(config.rules["oxclippy/needless-bool"]).toBe("warn");
     expect(config.rules["oxclippy/manual-clamp"]).toBe("error");
     expect(mergeOxlintConfig(merged, [])).toBe(merged);

@@ -57,23 +57,6 @@ Existing instructions are preserved. If only `CLAUDE.md` exists, it is migrated 
 You must never disable or suppress lint rules.
 ```
 
-## Oxray rules
-
-### `rayhanadev/no-type-erasure`
-
-Disallows broad object patterns that discard useful type information:
-
-- `Record<string, any>` and `Record<string, unknown>`
-- Equivalent string index signatures
-- `object`, `Object`, and empty `{}` types or interfaces
-- Calls named `isRecord`, including member and optional calls
-
-Use concrete object shapes and domain-specific type guards instead.
-
-### `rayhanadev/no-typeof`
-
-Disallows runtime `typeof` expressions. TypeScript type queries such as `type Value = typeof value` are allowed.
-
 ## Project detection
 
 Oxray infers Bun or Node.js from existing dependencies and project files. Ambiguous projects get an interactive prompt.

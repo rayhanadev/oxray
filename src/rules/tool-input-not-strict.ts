@@ -1,0 +1,42 @@
+/**
+ * Detects a top-level `input` or `inputSchema` rooted at `z.object()` in `defineTool` and
+ * `defineDomainTool`, because strict tool schemas reject hallucinated keys and emit
+ * `additionalProperties: false` for providers that require closed parameter objects.
+ *
+ * Flags: `defineTool({ input: z.object({ query: z.string() }) })`
+ *
+ * Does not flag: `defineTool({ input: z.strictObject({ query: z.string() }) })`, nested plain objects,
+ * or response projections outside a tool definition.
+ */
+import type { AstNode, OxlintRule } from "./types.ts";
+import { isToolInputProperty, zodRootConstructor } from "./zod-ast.ts";
+
+const toolInputNotStrict = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Require strict top-level Zod objects for tool inputs",
+    },
+    messages: {
+      strict:
+        "Tool inputs must use z.strictObject() so unknown model arguments are rejected and JSON Schema emits additionalProperties: false.",
+    },
+    schema: [],
+  },
+  create(context) {
+    return {
+      Property(rawNode) {
+        const node = rawNode as AstNode;
+        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        if (
+          isToolInputProperty(node, ancestors) &&
+          zodRootConstructor(node.value as AstNode) === "object"
+        ) {
+          context.report({ node: rawNode, messageId: "strict" });
+        }
+      },
+    };
+  },
+} satisfies OxlintRule;
+
+export default toolInputNotStrict;
