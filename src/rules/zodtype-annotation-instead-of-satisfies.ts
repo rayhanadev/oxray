@@ -1,13 +1,12 @@
 /**
- * Detects `const` schema declarations annotated as `z.ZodType<T>` or `z.ZodSchema<T>`, because the
- * annotation erases the concrete schema class and its specific methods while `satisfies` checks the
- * same contract without widening the declared value.
+ * Detects `const` schema declarations annotated as `z.ZodType<T>` or `z.ZodSchema<T>`. The
+ * annotation erases the concrete schema class. `satisfies` checks the contract without widening the
+ * value.
  *
  * Flags: `const userSchema: z.ZodType<User> = z.object({ id: z.string() });`
  *
- * Does not flag: `const userSchema = z.object({ id: z.string() }) satisfies z.ZodType<User>;`, a
- * recursive `z.lazy()` declaration whose annotation breaks an inference cycle, an exported schema
- * that deliberately hides its implementation type, or a mutable `let` declaration.
+ * Does not flag: a schema that uses `satisfies` or a recursive declaration that needs an annotation.
+ * It also permits an exported opaque schema or a mutable `let` declaration.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
 import {

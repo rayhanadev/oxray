@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { parse } from "jsonc-parser";
 
 import { mergeOxfmtConfig, mergeOxlintConfig, mergePackageJson } from "../src/json-config.ts";
-import { personalRuleNames } from "../src/rule-names.ts";
+import { personalRuleDefaults, personalRuleNames } from "../src/rule-names.ts";
 
 describe("JSONC config merging", () => {
   test("adds scripts without replacing unrelated package metadata", () => {
@@ -53,8 +53,9 @@ describe("JSONC config merging", () => {
     expect(config.options.typeAware).toBe(true);
     expect(config.rules["eslint/no-console"]).toBe("warn");
     for (const ruleName of personalRuleNames) {
-      expect(config.rules[`rayhanadev/${ruleName}`]).toBe("error");
+      expect(config.rules[`rayhanadev/${ruleName}`]).toBe(personalRuleDefaults[ruleName]);
     }
+    expect(config.options.reportUnusedDisableDirectives).toBe("error");
     expect(config.rules["oxclippy/needless-bool"]).toBe("warn");
     expect(config.rules["oxclippy/manual-clamp"]).toBe("error");
     expect(mergeOxlintConfig(merged, [])).toBe(merged);
@@ -72,6 +73,7 @@ describe("JSONC config merging", () => {
     const config = JSON.parse(merged);
 
     expect(config.sortImports).toEqual({ newlinesBetween: false });
+    expect(config.ignorePatterns).toEqual(["AGENTS.md"]);
     expect(config.sortPackageJson).toBe(true);
     expect(config.sortTailwindcss).toBe(true);
     expect(mergeOxfmtConfig(merged)).toBe(merged);

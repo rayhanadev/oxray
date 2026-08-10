@@ -1,7 +1,6 @@
 /**
- * Detects runtime `typeof` expressions, because oxray projects should narrow values with
- * domain-specific guards or schemas that preserve concrete type information instead of branching
- * on primitive labels.
+ * Detects runtime `typeof` expressions. Oxray projects should narrow values with specific guards or
+ * schemas that preserve concrete information instead of branching on primitive labels.
  *
  * Flags: `if (typeof value === "string") use(value);`
  *

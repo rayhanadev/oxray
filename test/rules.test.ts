@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { personalRuleNames } from "../src/rule-names.ts";
+import { personalRuleDefaults, personalRuleNames } from "../src/rule-names.ts";
 
 let fixtureDirectory: string;
 let fixtureNumber = 0;
@@ -21,12 +21,19 @@ beforeAll(async () => {
           },
         ],
         rules: Object.fromEntries(
-          personalRuleNames.map((ruleName) => [`rayhanadev/${ruleName}`, "error"]),
+          personalRuleNames.map((ruleName) => [
+            `rayhanadev/${ruleName}`,
+            personalRuleDefaults[ruleName],
+          ]),
         ),
       },
       null,
       2,
     ),
+  );
+  await Bun.write(
+    join(fixtureDirectory, "AGENTS.md"),
+    "# Fixture guidance\n\n## Retry policy\n\nRetry only transient failures.\n",
   );
 });
 
@@ -120,9 +127,19 @@ describe("no-typeof", () => {
 });
 
 describe("Zod 4 rules", () => {
-  const zodRuleNames = personalRuleNames.filter(
-    (ruleName) => ruleName !== "no-type-erasure" && ruleName !== "no-typeof",
-  );
+  const nonZodRuleNames = new Set([
+    "comment-explains-why",
+    "comment-ste100",
+    "comment-ste100-heuristics",
+    "commented-out-code-requires-reason",
+    "complex-file-header",
+    "domain-knowledge-in-agents",
+    "lint-suppression-requires-reason",
+    "no-type-erasure",
+    "no-typeof",
+    "require-jsdoc-comments",
+  ]);
+  const zodRuleNames = personalRuleNames.filter((ruleName) => !nonZodRuleNames.has(ruleName));
 
   test("reports the mined high-signal anti-patterns", async () => {
     const result = await lint(`
@@ -145,6 +162,7 @@ z.strictObject({ a: z.string(), b: z.string() }).superRefine((value, ctx) => {
     ctx.addIssue({ code: "custom", message: "a and b conflict" });
   }
 });
+
 const refined = z.strictObject({ id: z.string() }).superRefine(() => {});
 z.strictObject({ ...refined.shape, name: z.string() });
 z.string().min(1).trim();
@@ -326,5 +344,302 @@ schema.string().uuidv7();
     expect(result.output).toContain("schema.uuidv6()");
     expect(result.output).toContain("schema.uuidv7()");
     expect(result.output).not.toContain("schema.cuid2()");
+  });
+});
+
+describe("comment rules", () => {
+  test("requires useful JSDoc on public functions and classes", async () => {
+    const result = await lint(`
+export function connectClient() {}
+// Preserves a stable identity because callers cache each client.
+class ClientFactory {}
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(require-jsdoc-comments)");
+  });
+
+  test("accepts public JSDoc that explains a contract", async () => {
+    const result = await lint(`
+/** Uses one client instance so callers can share connection state. */
+export function connectClient() {}
+
+/** Preserves a stable identity because callers cache each client. */
+export class ClientFactory {}
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(require-jsdoc-comments)");
+  });
+
+  test("resolves indirect, default, and variable exports", async () => {
+    const result = await lint(`
+/** Shares one connection because callers reuse provider state. */
+const connect = () => {};
+export { connect };
+
+/** Preserves the provider contract when this module is the default import. */
+function ProviderClient() {}
+export default ProviderClient;
+
+/** Defers setup until the command selects a runtime. */
+export const initialize = async () => {};
+
+function internalHelper() {}
+`);
+
+    expect(result.output).not.toContain("rayhanadev(require-jsdoc-comments)");
+  });
+
+  test("shares JSDoc across overloads and unwraps typed function exports", async () => {
+    const result = await lint(`
+/** Preserves the input family so callers receive the corresponding output type. */
+export function convert(value: string): string;
+export function convert(value: number): number;
+export function convert(value: string | number): string | number { return value; }
+
+/** Uses the declared callable contract without hiding the exported function. */
+export const load = (() => value) satisfies () => string;
+`);
+
+    expect(result.output).not.toContain("rayhanadev(require-jsdoc-comments)");
+  });
+
+  test("does not use a trailing comment as public API documentation", async () => {
+    const result = await lint(`
+const prior = value; /** Describes only the prior value. */
+export function load() {}
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(require-jsdoc-comments)");
+  });
+
+  test("requires JSDoc when a plain comment describes a method", async () => {
+    const result = await lint(`
+class Client {
+  // Preserves the request identifier when the provider retries.
+  retry() {}
+}
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(require-jsdoc-comments)");
+  });
+
+  test("does not attach variable comments or directives to nested callbacks", async () => {
+    const result = await lint(`
+// The output keeps only active users.
+const output = users.filter((user) => user.active);
+
+// @ts-ignore
+function generatedCompatibilityShim() {}
+
+////////////////////////////////////////
+function groupedHelper() {}
+
+const first = () => {}; // This result is fast.
+const second = () => {};
+`);
+
+    expect(result.output).not.toContain("rayhanadev(require-jsdoc-comments)");
+  });
+
+  test("enforces deterministic STE prose limits", async () => {
+    const result = await lint(`
+// The client can't retry this operation; preserve the original response.
+const response = value;
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(comment-ste100)");
+  });
+
+  test("enforces exact descriptive and procedural sentence boundaries", async () => {
+    const descriptive25 = `// ${Array.from({ length: 25 }, (_, index) => `word${index}`).join(" ")}.`;
+    const descriptive26 = `// ${Array.from({ length: 26 }, (_, index) => `word${index}`).join(" ")}.`;
+    const procedural20 = `// Use ${Array.from({ length: 19 }, (_, index) => `item${index}`).join(" ")}.`;
+    const procedural21 = `// Use ${Array.from({ length: 20 }, (_, index) => `item${index}`).join(" ")}.`;
+
+    const valid = await lint(`${descriptive25}\n${procedural20}\n`);
+    const tooLong = await lint(`${descriptive26}\n${procedural21}\n`);
+
+    expect(valid.output).not.toContain("rayhanadev(comment-ste100)");
+    expect(valid.output).not.toContain("rayhanadev(comment-ste100-heuristics)");
+    expect(tooLong.exitCode).toBe(1);
+    expect(tooLong.output).toContain("rayhanadev(comment-ste100)");
+    expect(tooLong.output).toContain("rayhanadev(comment-ste100-heuristics)");
+  });
+
+  test("checks a parenthetical sentence independently", async () => {
+    const inner = Array.from({ length: 26 }, (_, index) => `word${index}`).join(" ");
+    const result = await lint(`// Keep the value (${inner}).\n`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(comment-ste100)");
+  });
+
+  test("warns about passive voice without failing lint", async () => {
+    const result = await lint(`
+// The response is processed by the worker.
+const response = value;
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("rayhanadev(comment-ste100-heuristics)");
+  });
+
+  test("warns only on a high-confidence dense noun cluster", async () => {
+    const dense = await lint(
+      "// Configuration implementation instrumentation authorization fails safely.\n",
+    );
+    const technical = await lint(
+      "// Read-only projection over organization-member fields stays narrow.\n",
+    );
+
+    expect(dense.output).toContain("rayhanadev(comment-ste100-heuristics)");
+    expect(technical.output).not.toContain("rayhanadev(comment-ste100-heuristics)");
+  });
+
+  test("does not mistake adjectives and pronouns for progressive tense", async () => {
+    const result = await lint(`
+// The value is missing, and there is nothing to recover.
+// This string is confusing without its label.
+const result = value;
+`);
+
+    expect(result.output).not.toContain("rayhanadev(comment-ste100-heuristics)");
+  });
+
+  test("does not mistake the adjective red for passive voice", async () => {
+    const result = await lint("// CI is red when the generated table changes.\n");
+
+    expect(result.output).not.toContain("rayhanadev(comment-ste100-heuristics)");
+  });
+
+  test("warns when JSDoc only restates a declaration name", async () => {
+    const result = await lint(`
+/** Returns the user. */
+function getUser() {}
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("rayhanadev(comment-explains-why)");
+  });
+
+  test("moves marked domain facts and validates AGENTS references", async () => {
+    const invalid = await lint(`
+// INVARIANT: A retry always preserves the request identifier.
+const requestId = value;
+/** @see AGENTS.md#missing-policy */
+const retry = value;
+`);
+    const valid = await lint(`
+/** @see AGENTS.md#retry-policy */
+const retry = value;
+`);
+
+    expect(invalid.exitCode).toBe(1);
+    expect(invalid.output).toContain("rayhanadev(domain-knowledge-in-agents)");
+    expect(valid.exitCode).toBe(0);
+    expect(valid.output).not.toContain("rayhanadev(domain-knowledge-in-agents)");
+  });
+
+  test("ignores domain markers inside JSDoc examples", async () => {
+    const result = await lint(`
+/**
+ * Shows how callers document a shared constraint.
+ * @example
+ * // INVARIANT: The request identifier remains stable.
+ */
+const example = value;
+`);
+
+    expect(result.output).not.toContain("rayhanadev(domain-knowledge-in-agents)");
+  });
+
+  test("requires narrow lint suppressions with explanations", async () => {
+    const invalid = await lint(`
+// oxlint-disable-next-line no-console
+console.log(value);
+`);
+    const broad = await lint(`
+/* oxlint-disable no-console -- The executable must print its final result. */
+console.log(value);
+`);
+    const valid = await lint(`
+// oxlint-disable-next-line no-console -- The executable must print its final result.
+console.log(value);
+`);
+
+    expect(invalid.exitCode).toBe(1);
+    expect(broad.exitCode).toBe(1);
+    expect(invalid.output).toContain("rayhanadev(lint-suppression-requires-reason)");
+    expect(broad.output).toContain("rayhanadev(lint-suppression-requires-reason)");
+    expect(valid.output).not.toContain("rayhanadev(lint-suppression-requires-reason)");
+  });
+
+  test("requires a rationale for commented-out implementation code", async () => {
+    const invalid = await lint("// const oldValue = loadValue();\n");
+    const kept = await lint(`
+// KEPT: This statement documents the legacy migration fallback.
+// const oldValue = loadValue();
+`);
+    const example = await lint(`
+/**
+ * @example
+ * const oldValue = loadValue();
+ */
+const exampleValue = value;
+`);
+
+    expect(invalid.exitCode).toBe(1);
+    expect(invalid.output).toContain("rayhanadev(commented-out-code-requires-reason)");
+    expect(kept.output).not.toContain("rayhanadev(commented-out-code-requires-reason)");
+    expect(example.output).not.toContain("rayhanadev(commented-out-code-requires-reason)");
+  });
+
+  test("does not mistake imperative prose for commented-out code", async () => {
+    const result = await lint(`
+// Return the original value when validation fails.
+// app.get(handler)
+// SHA256 (32 bytes): base64 output has 44 characters.
+const result = value;
+`);
+
+    expect(result.output).not.toContain("rayhanadev(commented-out-code-requires-reason)");
+  });
+
+  test("warns when a structurally complex module has no file overview", async () => {
+    const declarations = Array.from(
+      { length: 15 },
+      (_, index) => `export const value${index} = ${index};`,
+    ).join("\n");
+    const missing = await lint(declarations);
+    const documented = await lint(`
+/** @fileoverview Groups configuration values so consumers use one import boundary. */
+${declarations}
+`);
+
+    expect(missing.exitCode).toBe(0);
+    expect(missing.output).toContain("rayhanadev(complex-file-header)");
+    expect(documented.output).not.toContain("rayhanadev(complex-file-header)");
+  });
+
+  test("uses control-flow decisions and exempts pure barrels", async () => {
+    const branches = Array.from(
+      { length: 29 },
+      (_, index) => `if (conditions[${index}]) consume(${index});`,
+    ).join("\n");
+    const complex = await lint(`function route() {\n${branches}\n}`);
+    const barrel = await lint(
+      Array.from(
+        { length: 20 },
+        (_, index) => `export { value${index} } from "./module-${index}.ts";`,
+      ).join("\n"),
+    );
+
+    expect(complex.output).toContain("rayhanadev(complex-file-header)");
+    expect(barrel.output).not.toContain("rayhanadev(complex-file-header)");
   });
 });

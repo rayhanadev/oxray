@@ -1,6 +1,6 @@
 /**
- * Detects Zod unions made entirely from same-type primitive literals, because Zod 4's literal-array
- * form has the same accepted set while producing a flatter enum JSON Schema and simpler issues.
+ * Detects Zod unions made only from same-type primitive literals. Zod 4's literal-array form accepts
+ * the same values and produces a flatter enum schema with simpler issues.
  *
  * Flags: `z.union([z.literal(1), z.literal(2)])`
  *

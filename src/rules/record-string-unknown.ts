@@ -1,7 +1,6 @@
 /**
- * Detects `z.record(z.string(), z.unknown())` inside model-facing `defineTool` inputs, because JSON
- * tool arguments cannot contain arbitrary JavaScript values and should use a concrete projection or
- * deliberately choose recursive `z.json()` after checking its schema cost.
+ * Detects `z.record(z.string(), z.unknown())` inside model-facing tool inputs. JSON arguments cannot
+ * contain arbitrary JavaScript values. Use a concrete projection or assess recursive `z.json()`.
  *
  * Flags: `defineTool({ input: z.object({ metadata: z.record(z.string(), z.unknown()) }) })`
  *

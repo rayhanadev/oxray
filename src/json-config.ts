@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Applies focused JSONC edits for Oxray project configuration.
+ *
+ * Each merge preserves unrelated values and comments. The scaffold can therefore run repeatedly
+ * without replacing project-owned configuration.
+ */
 import {
   applyEdits,
   modify,
@@ -8,7 +14,7 @@ import {
 } from "jsonc-parser";
 
 import packageJson from "../package.json" with { type: "json" };
-import { personalRuleNames } from "./rule-names.ts";
+import { personalRuleDefaults, personalRuleNames } from "./rule-names.ts";
 
 export type RuleSetting = string | number | readonly [string | number, ...unknown[]];
 export type RuleEntry = readonly [name: string, setting: RuleSetting];
@@ -26,6 +32,7 @@ interface OxlintConfig {
 
 interface OxfmtConfig {
   $schema?: string;
+  ignorePatterns?: string[];
   sortImports?: unknown;
   sortPackageJson?: unknown;
   sortTailwindcss?: unknown;
@@ -37,6 +44,7 @@ const formattingOptions: FormattingOptions = {
   eol: "\n",
 };
 
+/** Parses JSONC and names the source file because configuration errors need actionable locations. */
 export function parseJsonc<T>(text: string, filename: string): T {
   const errors: ParseError[] = [];
   const value = parse(text, errors, { allowTrailingComma: true });
@@ -130,6 +138,7 @@ function appendJsPlugins(
   return next;
 }
 
+/** Adds Oxray scripts while preserving unrelated package metadata and JSONC formatting. */
 export function mergePackageJson(text: string): string {
   parseJsonc(text, "package.json");
   let next = setJsonValue(text, ["scripts", "format"], "oxfmt");
@@ -137,6 +146,7 @@ export function mergePackageJson(text: string): string {
   return next;
 }
 
+/** Enables the selected policy while preserving existing plugins, rules, and JSONC comments. */
 export function mergeOxlintConfig(text: string, oxclippyRules: readonly RuleEntry[]): string {
   const config = parseJsonc<OxlintConfig>(text, ".oxlintrc.json");
   let next = text;
@@ -149,9 +159,10 @@ export function mergeOxlintConfig(text: string, oxclippyRules: readonly RuleEntr
   next = appendJsPlugins(next, config.jsPlugins, ["oxclippy", personalPlugin]);
   next = setJsonValue(next, ["categories", "correctness"], "error");
   next = setJsonValue(next, ["options", "typeAware"], true);
+  next = setJsonValue(next, ["options", "reportUnusedDisableDirectives"], "error");
   next = setJsonValue(next, ["env", "builtin"], true);
   for (const ruleName of personalRuleNames) {
-    next = setJsonValue(next, ["rules", `rayhanadev/${ruleName}`], "error");
+    next = setJsonValue(next, ["rules", `rayhanadev/${ruleName}`], personalRuleDefaults[ruleName]);
   }
 
   for (const [ruleName, setting] of oxclippyRules) {
@@ -175,12 +186,14 @@ function enableOxfmtOption(
   return setJsonValue(text, [name], true);
 }
 
+/** Enables stable sorting without replacing object-valued formatter options. */
 export function mergeOxfmtConfig(text: string): string {
   const config = parseJsonc<OxfmtConfig>(text, ".oxfmtrc.json");
   let next = text;
   if (config.$schema === undefined) {
     next = setJsonValue(next, ["$schema"], "./node_modules/oxfmt/configuration_schema.json");
   }
+  next = appendStrings(next, "ignorePatterns", config.ignorePatterns, ["AGENTS.md"]);
   next = enableOxfmtOption(next, "sortImports", config.sortImports);
   next = enableOxfmtOption(next, "sortPackageJson", config.sortPackageJson);
   next = enableOxfmtOption(next, "sortTailwindcss", config.sortTailwindcss);

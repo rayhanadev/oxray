@@ -10,14 +10,19 @@ export interface AstNode {
   type: string;
   body?: AstNode | AstNode[];
   callee?: AstNode;
+  cases?: AstNode[];
   computed?: boolean;
   consequent?: AstNode;
+  declaration?: AstNode | null;
   declarations?: AstNode[];
+  decorators?: AstNode[];
   elements?: Array<AstNode | null>;
-  expression?: AstNode;
+  discriminant?: AstNode;
+  expression?: AstNode | boolean;
+  exportKind?: string;
   finalizer?: AstNode | null;
   handler?: AstNode | null;
-  id?: AstNode;
+  id?: AstNode | null;
   importKind?: string;
   imported?: AstNode;
   init?: AstNode | null;
@@ -25,17 +30,25 @@ export interface AstNode {
   kind?: string;
   left?: AstNode;
   local?: AstNode;
+  loc?: {
+    end: { column: number; line: number };
+    start: { column: number; line: number };
+  };
   members?: AstNode[];
   name?: string;
   object?: AstNode;
   operator?: string;
+  optional?: boolean;
   parameters?: AstNode[];
   params?: AstNode[];
   properties?: AstNode[];
   property?: AstNode;
   right?: AstNode;
+  range?: [number, number];
   source?: AstNode;
   specifiers?: AstNode[];
+  start?: number;
+  end?: number;
   test?: AstNode;
   typeName?: AstNode;
   typeAnnotation?: AstNode;
@@ -43,3 +56,17 @@ export interface AstNode {
   typeParameters?: AstNode;
   value?: boolean | number | string | null | AstNode;
 }
+
+export interface SourceComment {
+  end: number;
+  loc: {
+    end: { column: number; line: number };
+    start: { column: number; line: number };
+  };
+  range: [number, number];
+  start: number;
+  type: "Block" | "Line" | "Shebang";
+  value: string;
+}
+
+export type VisitorKeys = Readonly<Record<string, readonly string[]>>;

@@ -1,7 +1,6 @@
 /**
- * Detects a top-level `input` or `inputSchema` rooted at `z.object()` in `defineTool` and
- * `defineDomainTool`, because strict tool schemas reject hallucinated keys and emit
- * `additionalProperties: false` for providers that require closed parameter objects.
+ * Detects a top-level tool input rooted at `z.object()`. Strict tool schemas reject hallucinated
+ * keys and emit `additionalProperties: false` for providers that require closed parameter objects.
  *
  * Flags: `defineTool({ input: z.object({ query: z.string() }) })`
  *

@@ -1,6 +1,6 @@
 /**
- * Detects `.optional()` earlier in a schema chain that ends in `.default()`, because a Zod default
- * already accepts omitted or undefined input and the optional wrapper adds no behavior.
+ * Detects `.optional()` before `.default()` in a schema chain. A Zod default already accepts omitted
+ * or undefined input, so the optional wrapper adds no behavior.
  *
  * Flags: `z.string().optional().default("fallback")`
  *
