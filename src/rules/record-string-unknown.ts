@@ -1,14 +1,20 @@
 /**
- * Detects `z.record(z.string(), z.unknown())`, because it launders a broad
- * `Record<string, unknown>` through Zod while validating no useful value shape; callers should use
- * a concrete projection or deliberately choose recursive `z.json()` at a JSON boundary.
+ * Detects `z.record(z.string(), z.unknown())` inside model-facing `defineTool` inputs, because JSON
+ * tool arguments cannot contain arbitrary JavaScript values and should use a concrete projection or
+ * deliberately choose recursive `z.json()` after checking its schema cost.
  *
- * Flags: `z.record(z.string(), z.unknown())`
+ * Flags: `defineTool({ input: z.object({ metadata: z.record(z.string(), z.unknown()) }) })`
  *
- * Does not flag: `z.record(z.string(), userSchema)` or `z.record(z.string(), z.json())`.
+ * Does not flag: provider metadata and other open records outside a tool input,
+ * `z.record(z.string(), userSchema)`, or `z.record(z.string(), z.json())`.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { isDirectZodCall } from "./zod-ast.ts";
+import {
+  createZodImportState,
+  isDirectZodCall,
+  isInsideToolInput,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 const recordStringUnknown = {
   meta: {
@@ -18,19 +24,23 @@ const recordStringUnknown = {
     },
     messages: {
       broadRecord:
-        "z.record(z.string(), z.unknown()) validates no useful value shape. Use a concrete projection, or z.json() at a JSON boundary after checking its recursive-schema cost.",
+        "Tool arguments cross a JSON boundary, so this value cannot be arbitrary JavaScript. Use a concrete projection, or z.json() after checking its recursive-schema cost.",
     },
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
+        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
         if (
-          isDirectZodCall(node, "record") &&
+          isInsideToolInput(ancestors) &&
+          isDirectZodCall(node, "record", zod.roots) &&
           node.arguments?.length === 2 &&
-          isDirectZodCall(node.arguments[0], "string") &&
-          isDirectZodCall(node.arguments[1], "unknown")
+          isDirectZodCall(node.arguments[0], "string", zod.roots) &&
+          isDirectZodCall(node.arguments[1], "unknown", zod.roots)
         ) {
           context.report({ node: rawNode, messageId: "broadRecord" });
         }

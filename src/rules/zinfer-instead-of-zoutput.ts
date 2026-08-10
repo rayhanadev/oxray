@@ -7,7 +7,7 @@
  * Does not flag: `type User = z.output<typeof userSchema>;` or `z.input<typeof userSchema>`.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { qualifiedTypeName } from "./zod-ast.ts";
+import { createZodImportState, qualifiedTypeName, zodImportVisitor } from "./zod-ast.ts";
 
 const zinferInsteadOfZoutput = {
   meta: {
@@ -21,10 +21,12 @@ const zinferInsteadOfZoutput = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       TSTypeReference(rawNode) {
         const name = qualifiedTypeName(rawNode as AstNode);
-        if (name?.namespace === "z" && name.name === "infer") {
+        if (name && zod.roots.has(name.namespace) && name.name === "infer") {
           context.report({ node: rawNode, messageId: "preferOutput" });
         }
       },

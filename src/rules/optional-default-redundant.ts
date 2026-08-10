@@ -7,7 +7,14 @@
  * Does not flag: `z.string().default("fallback")` or `z.string().optional()`.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { chainHasMethod, isMethodCall, methodReceiver } from "./zod-ast.ts";
+import {
+  chainHasMethod,
+  createZodImportState,
+  isMethodCall,
+  methodReceiver,
+  zodRootIdentifier,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 const optionalMethods = new Set(["optional"]);
 
@@ -23,11 +30,14 @@ const optionalDefaultRedundant = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
         if (
           isMethodCall(node, "default") &&
+          zodRootIdentifier(node, zod.roots) !== undefined &&
           chainHasMethod(methodReceiver(node), optionalMethods)
         ) {
           context.report({ node: rawNode, messageId: "redundant" });

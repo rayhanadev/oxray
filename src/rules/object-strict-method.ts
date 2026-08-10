@@ -7,7 +7,12 @@
  * Does not flag: `z.strictObject({ id: z.string() })` or `z.looseObject({ id: z.string() })`.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { isMethodCall, zodRootConstructor } from "./zod-ast.ts";
+import {
+  createZodImportState,
+  isMethodCall,
+  zodRootConstructor,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 const objectStrictMethod = {
   meta: {
@@ -21,10 +26,12 @@ const objectStrictMethod = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
-        if (isMethodCall(node, "strict") && zodRootConstructor(node) === "object") {
+        if (isMethodCall(node, "strict") && zodRootConstructor(node, zod.roots) === "object") {
           context.report({ node: rawNode, messageId: "preferStrictObject" });
         }
       },

@@ -9,7 +9,12 @@
  * or response projections outside a tool definition.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { isToolInputProperty, zodRootConstructor } from "./zod-ast.ts";
+import {
+  createZodImportState,
+  isToolInputProperty,
+  zodRootConstructor,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 const toolInputNotStrict = {
   meta: {
@@ -24,13 +29,15 @@ const toolInputNotStrict = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       Property(rawNode) {
         const node = rawNode as AstNode;
         const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
         if (
           isToolInputProperty(node, ancestors) &&
-          zodRootConstructor(node.value as AstNode) === "object"
+          zodRootConstructor(node.value as AstNode, zod.roots) === "object"
         ) {
           context.report({ node: rawNode, messageId: "strict" });
         }

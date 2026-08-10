@@ -97,7 +97,8 @@ const noTypeErasure = {
         }
       },
       TSInterfaceBody(rawNode) {
-        if ((rawNode as AstNode).body?.length === 0) {
+        const body = (rawNode as AstNode).body;
+        if (Array.isArray(body) && body.length === 0) {
           context.report({ node: rawNode, messageId: "broadObject" });
         }
       },

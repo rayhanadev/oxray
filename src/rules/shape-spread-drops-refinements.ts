@@ -10,10 +10,12 @@
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   chainHasMethod,
+  createZodImportState,
   isDirectZodCall,
   memberName,
   unwrapExpression,
   zodObjectConstructors,
+  zodImportVisitor,
 } from "./zod-ast.ts";
 
 const refinementMethods = new Set(["check", "refine", "superRefine"]);
@@ -31,9 +33,11 @@ const shapeSpreadDropsRefinements = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     const declarations = new Map<string, AstNode>();
 
     return {
+      ...zodImportVisitor(zod),
       VariableDeclarator(rawNode) {
         const node = rawNode as AstNode;
         if (node.id?.type === "Identifier" && node.id.name && node.init) {
@@ -63,7 +67,7 @@ const shapeSpreadDropsRefinements = {
         const constructor = ancestors[objectIndex - 1];
         if (
           constructor?.type === "CallExpression" &&
-          [...zodObjectConstructors].some((name) => isDirectZodCall(constructor, name))
+          [...zodObjectConstructors].some((name) => isDirectZodCall(constructor, name, zod.roots))
         ) {
           context.report({ node: rawNode, messageId: "dropsRefinement" });
         }

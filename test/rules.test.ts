@@ -126,6 +126,7 @@ describe("Zod 4 rules", () => {
 
   test("reports the mined high-signal anti-patterns", async () => {
     const result = await lint(`
+import { z } from "zod/v4";
 type User = { id: string };
 
 z.string().url();
@@ -137,15 +138,22 @@ type Parsed = z.infer<typeof schema>;
 const annotated: z.ZodType<User> = z.object({ id: z.string() });
 function parseWith<T>(schema: z.ZodType<T>): T { return schema.parse(value); }
 schema.safeParse(JSON.parse(text));
+schema.safeParse(JSON.parse("{"));
 z.string().url().refine((value) => new URL(value).hostname.length > 0);
 z.strictObject({ a: z.string(), b: z.string() }).superRefine((value, ctx) => {
-  ctx.addIssue({ code: "custom", message: "a and b conflict" });
+  if (value.a === value.b) {
+    ctx.addIssue({ code: "custom", message: "a and b conflict" });
+  }
 });
 const refined = z.strictObject({ id: z.string() }).superRefine(() => {});
 z.strictObject({ ...refined.shape, name: z.string() });
 z.string().min(1).trim();
-z.record(z.string(), z.unknown());
-defineTool({ input: z.object({ pull_number: z.number() }) });
+defineTool({
+  input: z.object({
+    pull_number: z.number(),
+    metadata: z.record(z.string(), z.unknown()),
+  }),
+});
 `);
 
     expect(result.exitCode).toBe(1);
@@ -156,9 +164,11 @@ defineTool({ input: z.object({ pull_number: z.number() }) });
 
   test("accepts canonical forms and catalog exclusions", async () => {
     const result = await lint(`
+import { z } from "zod/v4";
 type User = { id: string };
 
 z.url().max(2_048);
+z.string().trim().email();
 z.int().positive();
 z.coerce.number().int();
 z.strictObject({ id: z.string() });
@@ -189,7 +199,10 @@ const stillRefined = z.strictObject({ id: z.string() }).superRefine(() => {});
 stillRefined.extend({ name: z.string() });
 z.string().trim().min(1);
 z.record(z.string(), z.string());
-const providerResponse = z.object({ count: z.number() });
+const providerResponse = z.object({
+  count: z.number(),
+  providerMetadata: z.record(z.string(), z.unknown()),
+});
 defineTool({
   input: z.strictObject({
     pull_number: z.int(),
@@ -208,12 +221,110 @@ function schemaFor<T>(): z.ZodType<T> { return value; }
 
   test("requires try/catch inside the refinement callback", async () => {
     const result = await lint(`
+import { z } from "zod/v4";
 try {
   z.string().refine((value) => new URL(value).hostname.length > 0);
 } catch {}
+z.string()
+  .min(1, { abort: true })
+  .superRefine((value, ctx) => {
+    if (value === "blocked") {
+      ctx.addIssue({ code: "custom", message: "blocked", fatal: true });
+    }
+  })
+  .refine((value) => new URL(value).hostname.length > 0);
 `);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain("rayhanadev(throwing-zod-refine)");
+  });
+
+  test("recognizes earlier aborting refinement guards", async () => {
+    const result = await lint(`
+import { z } from "zod/v4";
+
+z.url({ abort: true }).refine((value) => new URL(value).hostname.length > 0);
+z.url()
+  .superRefine((value, ctx) => {
+    if (!URL.canParse(value)) {
+      ctx.addIssue({ code: "custom", message: "invalid URL", fatal: true });
+      return z.NEVER;
+    }
+  })
+  .refine((value) => new URL(value).hostname.length > 0);
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(throwing-zod-refine)");
+  });
+
+  test("ignores explicit Zod 3 and unrelated z bindings", async () => {
+    const result = await lint(`
+import { z as z3 } from "zod/v3";
+
+z3.string().url();
+z3.number().int();
+z3.union([z3.literal(1), z3.literal(2)]);
+
+const z = makeUnrelatedBuilder();
+z.string().url();
+z.number().int();
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(");
+  });
+
+  test("keeps intentional broad and order-sensitive schemas", async () => {
+    const result = await lint(`
+import { z } from "zod/v4";
+
+type Node = { children: Node[] };
+const nodeSchema: z.ZodType<Node> = z.lazy(() =>
+  z.object({ children: z.array(nodeSchema) }),
+);
+const getterSchema: z.ZodType<Node> = z.object({
+  get children() {
+    return z.array(getterSchema);
+  },
+});
+export const publicSchema: z.ZodType<Node> = z.object({ children: z.array(z.unknown()) });
+
+function codec<Output, Input>(schema: z.ZodType<Output, Input>) {
+  return schema;
+}
+function factory<Output>(options: { schema: z.ZodType<Output> }) {
+  return options.schema;
+}
+
+const providerMetadata = z.record(z.string(), z.unknown());
+schema.safeParse(JSON.parse('{"__proto__":123}'));
+z.string().min(2).trim();
+z.strictObject({ a: z.string(), b: z.string(), c: z.string() }).superRefine((value, ctx) => {
+  if (value.a === "" && value.b === "" && value.c === "") {
+    ctx.addIssue({ code: "custom", message: "at least one value is required" });
+  }
+});
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(");
+  });
+
+  test("preserves CUID and versioned UUID formats in suggestions", async () => {
+    const result = await lint(`
+import { z as schema } from "zod/v4";
+schema.string().cuid();
+schema.string().uuidv4();
+schema.string().uuidv6();
+schema.string().uuidv7();
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("schema.cuid()");
+    expect(result.output).toContain("schema.uuidv4()");
+    expect(result.output).toContain("schema.uuidv6()");
+    expect(result.output).toContain("schema.uuidv7()");
+    expect(result.output).not.toContain("schema.cuid2()");
   });
 });

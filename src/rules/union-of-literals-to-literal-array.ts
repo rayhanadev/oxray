@@ -8,15 +8,20 @@
  */
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
+  createZodImportState,
   isDirectZodCall,
   isPrimitiveLiteral,
   primitiveLiteralKind,
   unwrapExpression,
+  zodImportVisitor,
 } from "./zod-ast.ts";
 
-function literalValue(node: AstNode | null | undefined): AstNode | undefined {
+function literalValue(
+  node: AstNode | null | undefined,
+  roots: ReadonlySet<string>,
+): AstNode | undefined {
   const current = unwrapExpression(node);
-  if (!isDirectZodCall(current, "literal") || current?.arguments?.length !== 1) {
+  if (!isDirectZodCall(current, "literal", roots) || current?.arguments?.length !== 1) {
     return undefined;
   }
   const [value] = current.arguments;
@@ -35,10 +40,12 @@ const unionOfLiteralsToLiteralArray = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
-        if (!isDirectZodCall(node, "union") || node.arguments?.length !== 1) {
+        if (!isDirectZodCall(node, "union", zod.roots) || node.arguments?.length !== 1) {
           return;
         }
 
@@ -48,7 +55,7 @@ const unionOfLiteralsToLiteralArray = {
           return;
         }
 
-        const values = (array.elements ?? []).map(literalValue);
+        const values = (array.elements ?? []).map((element) => literalValue(element, zod.roots));
         if (values.some((value) => value === undefined)) {
           return;
         }

@@ -5,17 +5,32 @@
  *
  * Flags: `const userSchema: z.ZodType<User> = z.object({ id: z.string() });`
  *
- * Does not flag: `const userSchema = z.object({ id: z.string() }) satisfies z.ZodType<User>;` or a
- * mutable `let` declaration whose annotation intentionally controls later assignments.
+ * Does not flag: `const userSchema = z.object({ id: z.string() }) satisfies z.ZodType<User>;`, a
+ * recursive `z.lazy()` declaration whose annotation breaks an inference cycle, an exported schema
+ * that deliberately hides its implementation type, or a mutable `let` declaration.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { qualifiedTypeName, unwrapExpression, zodRootConstructor } from "./zod-ast.ts";
+import {
+  astSubtreeSome,
+  createZodImportState,
+  qualifiedTypeName,
+  unwrapExpression,
+  zodRootConstructor,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
-function annotatedZodType(identifier: AstNode | null | undefined): boolean {
+const concreteSchemaConstructors = new Set(["enum", "looseObject", "object", "strictObject"]);
+
+function annotatedZodType(
+  identifier: AstNode | null | undefined,
+  roots: ReadonlySet<string>,
+): boolean {
   const annotation = unwrapExpression(identifier?.typeAnnotation);
   const type = unwrapExpression(annotation?.typeAnnotation);
   const name = qualifiedTypeName(type);
-  return name?.namespace === "z" && (name.name === "ZodSchema" || name.name === "ZodType");
+  return Boolean(
+    name && roots.has(name.namespace) && (name.name === "ZodSchema" || name.name === "ZodType"),
+  );
 }
 
 const zodtypeAnnotationInsteadOfSatisfies = {
@@ -31,17 +46,35 @@ const zodtypeAnnotationInsteadOfSatisfies = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       VariableDeclaration(rawNode) {
         const node = rawNode as AstNode;
         if (node.kind !== "const") {
           return;
         }
 
+        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        if (ancestors.some((ancestor) => ancestor.type.startsWith("Export"))) {
+          return;
+        }
+
         for (const declaration of node.declarations ?? []) {
+          const identifier = declaration.id;
+          const constructor = zodRootConstructor(declaration.init, zod.roots);
+          const selfReferences =
+            identifier?.type === "Identifier" &&
+            identifier.name !== undefined &&
+            astSubtreeSome(
+              declaration.init,
+              (candidate) => candidate.type === "Identifier" && candidate.name === identifier.name,
+            );
           if (
-            annotatedZodType(declaration.id) &&
-            zodRootConstructor(declaration.init) !== undefined
+            annotatedZodType(identifier, zod.roots) &&
+            constructor !== undefined &&
+            concreteSchemaConstructors.has(constructor) &&
+            !selfReferences
           ) {
             context.report({ node: rawNode, messageId: "preferSatisfies" });
           }

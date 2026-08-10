@@ -5,10 +5,18 @@
  *
  * Flags: `schema.safeParse(JSON.parse(text))`
  *
- * Does not flag: the same call inside a `try` block, or `jsonCodec(schema).safeParse(text)`.
+ * Does not flag: the same call inside a `try` block, a compile-time string literal confirmed to be
+ * valid JSON, or `jsonCodec(schema).safeParse(text)`.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { isInsideTryBlock, isMethodCall, memberName, unwrapExpression } from "./zod-ast.ts";
+import {
+  createZodImportState,
+  isInsideTryBlock,
+  isMethodCall,
+  memberName,
+  unwrapExpression,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 function isJsonParse(node: AstNode | null | undefined): boolean {
   const current = unwrapExpression(node);
@@ -21,6 +29,21 @@ function isJsonParse(node: AstNode | null | undefined): boolean {
     object.name === "JSON" &&
     memberName(callee) === "parse"
   );
+}
+
+function parsesKnownValidJson(node: AstNode | null | undefined): boolean {
+  const current = unwrapExpression(node);
+  const input = unwrapExpression(current?.arguments?.[0]);
+  const constructor = (input?.value as { constructor?: unknown } | null)?.constructor;
+  if (input?.type !== "Literal" || constructor !== String) {
+    return false;
+  }
+  try {
+    JSON.parse(input.value as string);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const jsonParseArgumentOfSafeparse = {
@@ -36,10 +59,17 @@ const jsonParseArgumentOfSafeparse = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
-        if (!isMethodCall(node, "safeParse") || !isJsonParse(node.arguments?.[0])) {
+        if (
+          zod.roots.size === 0 ||
+          !isMethodCall(node, "safeParse") ||
+          !isJsonParse(node.arguments?.[0]) ||
+          parsesKnownValidJson(node.arguments?.[0])
+        ) {
           return;
         }
 

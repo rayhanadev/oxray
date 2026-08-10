@@ -6,10 +6,17 @@
  * Flags: `function parse<T>(schema: z.ZodType<T>): T { return schema.parse(value); }`
  *
  * Does not flag: `function parse<S extends z.ZodType>(schema: S): z.output<S> { ... }` or a function
- * that merely returns `z.ZodType<T>` without accepting one as a parameter.
+ * that merely returns `z.ZodType<T>` without accepting one as a parameter. It also leaves an
+ * explicit `z.ZodType<Output, Input>` alone because that helper preserves both directions.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { isFunctionNode, qualifiedTypeName, unwrapExpression } from "./zod-ast.ts";
+import {
+  createZodImportState,
+  isFunctionNode,
+  qualifiedTypeName,
+  unwrapExpression,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 function typeParameterName(node: AstNode | null | undefined): string | undefined {
   const name = node?.name;
@@ -36,15 +43,25 @@ const zodtypeTGenericHelper = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       TSTypeReference(rawNode) {
         const node = rawNode as AstNode;
         const qualifiedName = qualifiedTypeName(node);
-        if (qualifiedName?.namespace !== "z" || qualifiedName.name !== "ZodType") {
+        if (
+          !qualifiedName ||
+          !zod.roots.has(qualifiedName.namespace) ||
+          qualifiedName.name !== "ZodType"
+        ) {
           return;
         }
 
-        const [argument] = node.typeArguments?.params ?? node.typeParameters?.params ?? [];
+        const arguments_ = node.typeArguments?.params ?? node.typeParameters?.params ?? [];
+        if (arguments_.length !== 1) {
+          return;
+        }
+        const [argument] = arguments_;
         const typeArgument = unwrapExpression(argument);
         const argumentTypeName =
           typeArgument?.type === "TSTypeReference"
@@ -61,13 +78,14 @@ const zodtypeTGenericHelper = {
           return;
         }
 
-        const isParameterType = (fn.params ?? []).some((parameter) =>
-          ancestors.includes(parameter),
-        );
+        const isDirectParameterType = (fn.params ?? []).some((parameter) => {
+          const annotation = unwrapExpression(parameter.typeAnnotation);
+          return unwrapExpression(annotation?.typeAnnotation) === node;
+        });
         const declaresType = (fn.typeParameters?.params ?? []).some(
           (parameter) => typeParameterName(parameter) === argumentTypeName.name,
         );
-        if (isParameterType && declaresType) {
+        if (isDirectParameterType && declaresType) {
           context.report({ node: rawNode, messageId: "preserveSchema" });
         }
       },

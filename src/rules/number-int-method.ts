@@ -8,7 +8,12 @@
  * Does not flag: `z.int().positive()` or `z.coerce.number().int()` (Zod has no coercing `z.int()`).
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { isMethodCall, zodRootConstructor } from "./zod-ast.ts";
+import {
+  createZodImportState,
+  isMethodCall,
+  zodRootConstructor,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 const numberIntMethod = {
   meta: {
@@ -22,10 +27,12 @@ const numberIntMethod = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
-        if (isMethodCall(node, "int") && zodRootConstructor(node) === "number") {
+        if (isMethodCall(node, "int") && zodRootConstructor(node, zod.roots) === "number") {
           context.report({ node: rawNode, messageId: "preferInt" });
         }
       },

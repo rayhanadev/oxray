@@ -4,39 +4,49 @@
  *
  * Flags: `z.string().url()`, `z.string().email()`, and `z.string().datetime()`
  *
- * Does not flag: `z.url()`, `z.email()`, or `z.iso.datetime()`. The rule never suggests `z.httpUrl()`,
- * which rejects localhost and IP-literal HTTP endpoints.
+ * Does not flag: `z.url()`, code imported explicitly from `zod/v3`, or a chain such as
+ * `z.string().trim().email()` whose pre-format operation makes a top-level-constructor rewrite
+ * order-sensitive. The rule never suggests `z.httpUrl()`, and it preserves CUID and versioned UUID
+ * formats exactly.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-import { isMethodCall, zodRootConstructor } from "./zod-ast.ts";
+import {
+  createZodImportState,
+  isDirectZodCall,
+  isMethodCall,
+  methodReceiver,
+  zodRootConstructor,
+  zodRootIdentifier,
+  zodImportVisitor,
+} from "./zod-ast.ts";
 
 const replacements = {
-  base64: "z.base64()",
-  base64url: "z.base64url()",
-  cidrv4: "z.cidrv4()",
-  cidrv6: "z.cidrv6()",
-  cuid: "z.cuid2()",
-  cuid2: "z.cuid2()",
-  date: "z.iso.date()",
-  datetime: "z.iso.datetime()",
-  duration: "z.iso.duration()",
-  e164: "z.e164()",
-  email: "z.email()",
-  emoji: "z.emoji()",
-  guid: "z.guid()",
-  ipv4: "z.ipv4()",
-  ipv6: "z.ipv6()",
-  jwt: "z.jwt()",
-  ksuid: "z.ksuid()",
-  nanoid: "z.nanoid()",
-  time: "z.iso.time()",
-  ulid: "z.ulid()",
-  url: "z.url()",
-  uuid: "z.uuid()",
-  uuidv4: "z.uuid()",
-  uuidv6: "z.uuid()",
-  uuidv7: "z.uuid()",
-  xid: "z.xid()",
+  base64: "base64()",
+  base64url: "base64url()",
+  cidrv4: "cidrv4()",
+  cidrv6: "cidrv6()",
+  cuid: "cuid()",
+  cuid2: "cuid2()",
+  date: "iso.date()",
+  datetime: "iso.datetime()",
+  duration: "iso.duration()",
+  e164: "e164()",
+  email: "email()",
+  emoji: "emoji()",
+  guid: "guid()",
+  ipv4: "ipv4()",
+  ipv6: "ipv6()",
+  jwt: "jwt()",
+  ksuid: "ksuid()",
+  nanoid: "nanoid()",
+  time: "iso.time()",
+  ulid: "ulid()",
+  url: "url()",
+  uuid: "uuid()",
+  uuidv4: "uuidv4()",
+  uuidv6: "uuidv6()",
+  uuidv7: "uuidv7()",
+  xid: "xid()",
 } as const;
 
 const zod3StringFormatMethod = {
@@ -52,19 +62,29 @@ const zod3StringFormatMethod = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
-        if (zodRootConstructor(node) !== "string") {
+        if (zodRootConstructor(node, zod.roots) !== "string") {
+          return;
+        }
+
+        const root = zodRootIdentifier(node, zod.roots);
+        if (!root) {
           return;
         }
 
         for (const [method, replacement] of Object.entries(replacements)) {
-          if (isMethodCall(node, method)) {
+          if (
+            isMethodCall(node, method) &&
+            isDirectZodCall(methodReceiver(node), "string", zod.roots)
+          ) {
             context.report({
               node: rawNode,
               messageId: "deprecated",
-              data: { method, replacement },
+              data: { method, replacement: `${root}.${replacement}` },
             });
             return;
           }

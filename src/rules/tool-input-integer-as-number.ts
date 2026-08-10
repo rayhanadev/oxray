@@ -11,9 +11,11 @@
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   chainHasMethod,
+  createZodImportState,
   isToolInputProperty,
   propertyName,
   zodRootConstructor,
+  zodImportVisitor,
 } from "./zod-ast.ts";
 
 const integerMethods = new Set(["int"]);
@@ -33,7 +35,9 @@ const toolInputIntegerAsNumber = {
     schema: [],
   },
   create(context) {
+    const zod = createZodImportState();
     return {
+      ...zodImportVisitor(zod),
       Property(rawNode) {
         const node = rawNode as AstNode;
         const key = propertyName(node.key);
@@ -41,7 +45,7 @@ const toolInputIntegerAsNumber = {
         if (
           !key ||
           !integerField.test(key) ||
-          zodRootConstructor(value) !== "number" ||
+          zodRootConstructor(value, zod.roots) !== "number" ||
           chainHasMethod(value, integerMethods)
         ) {
           return;
