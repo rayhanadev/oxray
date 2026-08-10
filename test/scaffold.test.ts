@@ -4,16 +4,13 @@ import { join } from "node:path";
 
 import { parse } from "jsonc-parser";
 
-import {
-  applyGuardrails,
-  ensureAgentInstructions,
-  type GuardrailOperations,
-} from "../src/guardrails.ts";
+import packageJson from "../package.json" with { type: "json" };
 import { personalRuleNames } from "../src/rule-names.ts";
+import { applyScaffold, type ScaffoldOperations } from "../src/scaffold.ts";
 import { createTemporaryProjects } from "./temporary-projects.ts";
 
 const temporaryProjects = createTemporaryProjects(
-  "oxray-guardrails-test-",
+  "oxray-scaffold-test-",
   `{
   "name": "fixture",
   "scripts": {
@@ -27,12 +24,12 @@ afterEach(async () => {
   await temporaryProjects.cleanup();
 });
 
-describe("project guardrails", () => {
+describe("project scaffolding", () => {
   test("installs the toolchain, initializes configs, and remains idempotent", async () => {
     const directory = await temporaryProjects.create();
     const addedPackages: string[][] = [];
     const initializedPackages: string[] = [];
-    const operations: GuardrailOperations = {
+    const operations: ScaffoldOperations = {
       async addDevDependency(packageNames) {
         addedPackages.push(Array.isArray(packageNames) ? packageNames : [packageNames]);
         return {};
@@ -54,10 +51,10 @@ describe("project guardrails", () => {
       runtime: "bun" as const,
     };
 
-    await applyGuardrails(options, operations);
+    await applyScaffold(options, operations);
 
     expect(addedPackages[0]).toEqual([
-      "@rayhanadev/ox@0.1.0",
+      `${packageJson.name}@${packageJson.version}`,
       "oxlint@latest",
       "oxfmt@latest",
       "oxlint-tsgolint@latest",
@@ -70,20 +67,16 @@ describe("project guardrails", () => {
     const packageJsonPath = join(directory, "package.json");
     const oxlintPath = join(directory, ".oxlintrc.json");
     const oxfmtPath = join(directory, ".oxfmtrc.json");
-    const agentsPath = join(directory, "AGENTS.md");
-    const claudePath = join(directory, "CLAUDE.md");
     const firstPass = await Promise.all([
       readFile(packageJsonPath, "utf8"),
       readFile(oxlintPath, "utf8"),
       readFile(oxfmtPath, "utf8"),
-      readFile(agentsPath, "utf8"),
-      readFile(claudePath, "utf8"),
     ]);
-    const packageJson = JSON.parse(firstPass[0]);
+    const targetPackageJson = JSON.parse(firstPass[0]);
     const oxlint = parse(firstPass[1]);
     const oxfmt = JSON.parse(firstPass[2]);
 
-    expect(packageJson.scripts).toEqual({
+    expect(targetPackageJson.scripts).toEqual({
       test: "bun test",
       format: "oxfmt",
       lint: "oxlint",
@@ -99,49 +92,17 @@ describe("project guardrails", () => {
     expect(oxfmt.sortImports).toBe(true);
     expect(oxfmt.sortPackageJson).toBe(true);
     expect(oxfmt.sortTailwindcss).toBe(true);
-    expect(firstPass[3]).toBe("You must never disable or suppress lint rules.\n");
-    expect(firstPass[4]).toBe("See @AGENTS.md\n");
+    expect(await Bun.file(join(directory, "AGENTS.md")).exists()).toBe(false);
+    expect(await Bun.file(join(directory, "CLAUDE.md")).exists()).toBe(false);
 
-    await applyGuardrails(options, operations);
+    await applyScaffold(options, operations);
     const secondPass = await Promise.all([
       readFile(packageJsonPath, "utf8"),
       readFile(oxlintPath, "utf8"),
       readFile(oxfmtPath, "utf8"),
-      readFile(agentsPath, "utf8"),
-      readFile(claudePath, "utf8"),
     ]);
 
     expect(secondPass).toEqual(firstPass);
     expect(initializedPackages).toEqual(["oxlint", "oxfmt"]);
-  });
-
-  test("migrates existing Claude instructions", async () => {
-    const directory = await temporaryProjects.create();
-    await Bun.write(join(directory, "CLAUDE.md"), "# Project instructions\n\nUse Bun.\n");
-
-    await ensureAgentInstructions(directory);
-
-    expect(await readFile(join(directory, "AGENTS.md"), "utf8")).toBe(
-      "# Project instructions\n\nUse Bun.\n\nYou must never disable or suppress lint rules.\n",
-    );
-    expect(await readFile(join(directory, "CLAUDE.md"), "utf8")).toBe("See @AGENTS.md\n");
-  });
-
-  test("preserves both existing instruction files", async () => {
-    const directory = await temporaryProjects.create();
-    await Promise.all([
-      Bun.write(
-        join(directory, "AGENTS.md"),
-        "# Shared instructions\n\nYou must never disable or suppress lint rules.\n",
-      ),
-      Bun.write(join(directory, "CLAUDE.md"), "# Claude instructions\n"),
-    ]);
-
-    await ensureAgentInstructions(directory);
-
-    expect(await readFile(join(directory, "AGENTS.md"), "utf8")).toBe(
-      "# Shared instructions\n\nYou must never disable or suppress lint rules.\n\n# Claude instructions\n",
-    );
-    expect(await readFile(join(directory, "CLAUDE.md"), "utf8")).toBe("See @AGENTS.md\n");
   });
 });

@@ -1,11 +1,9 @@
 {
   "name": "@rayhanadev/ox",
   "version": "0.2.0",
-  "description": "Opinionated agent guardrails powered by Oxlint and Oxfmt",
+  "description": "Opinionated Oxlint rules and project scaffolding powered by Oxc",
   "keywords": [
-    "agents",
     "formatter",
-    "guardrails",
     "lint",
     "oxc",
     "oxfmt",
