@@ -1,0 +1,52 @@
+/**
+ * Detects `z.record(z.string(), z.unknown())` inside model-facing `defineTool` inputs, because JSON
+ * tool arguments cannot contain arbitrary JavaScript values and should use a concrete projection or
+ * deliberately choose recursive `z.json()` after checking its schema cost.
+ *
+ * Flags: `defineTool({ input: z.object({ metadata: z.record(z.string(), z.unknown()) }) })`
+ *
+ * Does not flag: provider metadata and other open records outside a tool input,
+ * `z.record(z.string(), userSchema)`, or `z.record(z.string(), z.json())`.
+ */
+import type { AstNode, OxlintRule } from "./types.ts";
+import {
+  createZodImportState,
+  isDirectZodCall,
+  isInsideToolInput,
+  zodImportVisitor,
+} from "./zod-ast.ts";
+
+const recordStringUnknown = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Disallow Zod records that preserve no value information",
+    },
+    messages: {
+      broadRecord:
+        "Tool arguments cross a JSON boundary, so this value cannot be arbitrary JavaScript. Use a concrete projection, or z.json() after checking its recursive-schema cost.",
+    },
+    schema: [],
+  },
+  create(context) {
+    const zod = createZodImportState();
+    return {
+      ...zodImportVisitor(zod),
+      CallExpression(rawNode) {
+        const node = rawNode as AstNode;
+        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        if (
+          isInsideToolInput(ancestors) &&
+          isDirectZodCall(node, "record", zod.roots) &&
+          node.arguments?.length === 2 &&
+          isDirectZodCall(node.arguments[0], "string", zod.roots) &&
+          isDirectZodCall(node.arguments[1], "unknown", zod.roots)
+        ) {
+          context.report({ node: rawNode, messageId: "broadRecord" });
+        }
+      },
+    };
+  },
+} satisfies OxlintRule;
+
+export default recordStringUnknown;

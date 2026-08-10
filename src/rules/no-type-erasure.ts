@@ -1,3 +1,12 @@
+/**
+ * Detects broad TypeScript object types and generic `isRecord` calls that erase known properties,
+ * because that lost shape forces downstream code to recover type information with casts or
+ * repetitive runtime checks.
+ *
+ * Flags: `type Data = Record<string, unknown>;` and `isRecord(value);`
+ *
+ * Does not flag: `type Users = Record<string, User>;` or `isUser(value);`
+ */
 import type { AstNode, OxlintRule } from "./types.ts";
 
 function isBroadValueType(node: AstNode | undefined): boolean {
@@ -42,7 +51,10 @@ function calleeName(node: AstNode | undefined): string | undefined {
     return node.property.name;
   }
 
-  return node.computed && node.property?.type === "Literal" ? node.property.value : undefined;
+  const value = node.property?.value;
+  return node.computed && node.property?.type === "Literal" && value !== undefined
+    ? (value as string)
+    : undefined;
 }
 
 const noTypeErasure = {
@@ -85,7 +97,8 @@ const noTypeErasure = {
         }
       },
       TSInterfaceBody(rawNode) {
-        if ((rawNode as AstNode).body?.length === 0) {
+        const body = (rawNode as AstNode).body;
+        if (Array.isArray(body) && body.length === 0) {
           context.report({ node: rawNode, messageId: "broadObject" });
         }
       },
