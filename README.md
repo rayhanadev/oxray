@@ -1,6 +1,6 @@
 # oxray
 
-Opinionated agent guardrails for TypeScript projects, powered by [Oxlint](https://oxc.rs/docs/guide/usage/linter.html), [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html), [oxclippy](https://github.com/rayhanadev/oxclippy), and a small set of personal rules.
+An opinionated [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) plugin and project scaffolder, powered by [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html), [oxclippy](https://github.com/rayhanadev/oxclippy), and a small set of personal rules.
 
 ## Quick start
 
@@ -29,7 +29,6 @@ Oxray:
 - Creates or updates `.oxlintrc.json` and `.oxfmtrc.json` without replacing unrelated settings or JSONC comments.
 - Enables the TypeScript, Unicorn, and Oxc lint plugins.
 - Enables import, `package.json`, and Tailwind CSS sorting.
-- Adds shared agent instructions that forbid disabling or suppressing lint rules.
 
 Running ox again with the same choices is safe and does not duplicate configuration.
 
@@ -41,21 +40,7 @@ Choose how much of oxclippy to enable during setup:
 - **Extensive** — every oxclippy rule.
 - **Custom** — choose from style, complexity, correctness, iterator, functions, principles, and pedantic presets.
 
-Oxclippy owns the reusable Clippy-inspired rules and presets. Oxray consumes them as one part of its personal guardrail setup.
-
-## Agent instructions
-
-Oxray makes `AGENTS.md` the shared source of project instructions and creates `CLAUDE.md` containing:
-
-```text
-See @AGENTS.md
-```
-
-Existing instructions are preserved. If only `CLAUDE.md` exists, it is migrated to `AGENTS.md`; if both files exist, their instructions are combined. Oxray then adds:
-
-```text
-You must never disable or suppress lint rules.
-```
+Oxclippy owns the reusable Clippy-inspired rules and presets. Oxray consumes them as one part of its project setup.
 
 ## Project detection
 

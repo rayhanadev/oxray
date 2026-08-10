@@ -4,13 +4,13 @@ import { cancel, intro, isCancel, log, multiselect, outro, select, spinner } fro
 import { detectPackageManager, type PackageManagerName } from "nypm";
 
 import packageJson from "../package.json" with { type: "json" };
-import { applyGuardrails, type PackageManagerSelection } from "./guardrails.ts";
 import {
   individualOxclippyPresetNames,
   type IndividualOxclippyPresetName,
   type OxclippyPresetName,
 } from "./oxclippy-presets.ts";
 import { inferRuntime, inspectProject, type ProjectPackageJson, type Runtime } from "./project.ts";
+import { applyScaffold, type PackageManagerSelection } from "./scaffold.ts";
 
 const supportedPackageManagers = ["bun", "npm", "pnpm", "yarn"] as const;
 
@@ -117,7 +117,7 @@ function printHelp(): void {
 Usage:
   ox
 
-Install opinionated agent guardrails powered by Oxlint, Oxfmt, oxclippy, and oxray.`);
+Scaffold Oxlint, Oxfmt, oxclippy, and oxray in the current package.`);
 }
 
 async function main(): Promise<void> {
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
   const progress = spinner();
   progress.start("Installing tools and merging configuration");
   try {
-    await applyGuardrails({ cwd, packageManager, presets, runtime });
+    await applyScaffold({ cwd, packageManager, presets, runtime });
     progress.stop("Oxlint and Oxfmt are ready");
   } catch (error) {
     progress.error("Setup failed");
