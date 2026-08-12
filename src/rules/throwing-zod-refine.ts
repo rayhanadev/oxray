@@ -10,12 +10,19 @@
  * also permits a guarded `z.stringFormat()` predicate. A `try` around schema construction does not
  * protect the callback.
  */
-import type { AstNode, OxlintRule } from "./types.ts";
+import {
+  correctionFromEdits,
+  replaceNode,
+  sourceTextForNode,
+  type Correction,
+} from "./corrections.ts";
+import type { AstNode, OxlintReportNode, OxlintRule } from "./types.ts";
 import {
   astSubtreeSome,
   calleeName,
   createZodImportState,
   enclosingRefinementCall,
+  isFunctionNode,
   isInsideTryBlock,
   memberName,
   methodReceiver,
@@ -108,20 +115,65 @@ function isUnprotectedRefinement(ancestors: readonly AstNode[], acceptsUrlGuard 
   );
 }
 
+function expressionRefinementCorrection(
+  sourceText: string,
+  ancestors: readonly AstNode[],
+): Correction | undefined {
+  const refinement = enclosingRefinementCall(ancestors);
+  if (!refinement || memberName(refinement.callee) !== "refine") {
+    return undefined;
+  }
+
+  const refinementIndex = ancestors.indexOf(refinement);
+  const callback = ancestors
+    .slice(refinementIndex + 1)
+    .find((ancestor) => isFunctionNode(ancestor));
+  const body = Array.isArray(callback?.body) ? undefined : callback?.body;
+  if (callback?.type !== "ArrowFunctionExpression" || body?.type === "BlockStatement") {
+    return undefined;
+  }
+
+  const bodyText = sourceTextForNode(sourceText, body);
+  if (bodyText === undefined) {
+    return undefined;
+  }
+  return correctionFromEdits(sourceText, callback, [
+    replaceNode(body, `{ try { return ${bodyText}; } catch { return false; } }`),
+  ]);
+}
+
 const throwingZodRefine = {
   meta: {
     type: "problem",
     docs: {
       description: "Disallow unprotected throwing operations in Zod refinements",
     },
+    hasSuggestions: true,
     messages: {
       mustNotThrow:
-        "Zod refinement callbacks must not throw. Guard this operation with try/catch or express it as an aborting schema check.",
+        "This operation can throw outside Zod's safeParse contract. Catch it inside the refinement and return false, or establish an earlier aborting schema check.",
+      mustNotThrowWithSuggestion:
+        "This operation can throw outside Zod's safeParse contract. Replace the callback with `{{replacement}}` so an exception becomes a failed refinement.",
+      wrapRefinement: "Catch exceptions inside this refinement callback.",
     },
     schema: [],
   },
   create(context) {
     const zod = createZodImportState();
+    const report = (rawNode: OxlintReportNode, ancestors: readonly AstNode[]): void => {
+      const correction = expressionRefinementCorrection(context.sourceCode.text, ancestors);
+      if (correction) {
+        context.report({
+          node: rawNode,
+          messageId: "mustNotThrowWithSuggestion",
+          data: { replacement: correction.replacement },
+          suggest: [{ messageId: "wrapRefinement", fix: correction.fix }],
+        });
+      } else {
+        context.report({ node: rawNode, messageId: "mustNotThrow" });
+      }
+    };
+
     return {
       ...zodImportVisitor(zod),
       CallExpression(rawNode) {
@@ -132,7 +184,7 @@ const throwingZodRefine = {
         ) {
           const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
           if (isUnprotectedRefinement(ancestors)) {
-            context.report({ node: rawNode, messageId: "mustNotThrow" });
+            report(rawNode, ancestors);
           }
         }
       },
@@ -141,7 +193,7 @@ const throwingZodRefine = {
         if (zod.roots.size > 0 && throwingNewExpressions.has(calleeName(node.callee) ?? "")) {
           const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
           if (isUnprotectedRefinement(ancestors, calleeName(node.callee) === "URL")) {
-            context.report({ node: rawNode, messageId: "mustNotThrow" });
+            report(rawNode, ancestors);
           }
         }
       },

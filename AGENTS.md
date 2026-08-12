@@ -137,4 +137,12 @@ Delete commented-out implementation code or move it to a JSDoc example.
 If disabled code must remain, add `KEPT: <reason>` immediately before it.
 
 If the ASD-STE100 skill is available, use it when you write or revise substantial documentation.
+
+## Responding to lint diagnostics
+
+- Apply the exact replacement when a diagnostic provides one.
+- Run `oxlint --fix` for corrections that preserve runtime behavior.
+- Review each change before you run `oxlint --fix-suggestions`.
+- Replace diagnostic placeholders with project-specific names and types.
+- Run Oxfmt and Oxlint after each correction.
 <!-- oxray:comments:end -->

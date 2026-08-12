@@ -6,6 +6,7 @@
  *
  * Does not flag: `z.literal([1, 2])` or `z.union([z.literal(1), z.literal("two")])`.
  */
+import { correctionFromEdits, removeRange, replaceNode, type TextEdit } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   createZodImportState,
@@ -34,8 +35,12 @@ const unionOfLiteralsToLiteralArray = {
     docs: {
       description: "Prefer Zod 4 literal arrays over unions of primitive literals",
     },
+    fixable: "code",
     messages: {
-      flatten: "Use z.literal([values...]) instead of a union of same-type literals.",
+      flatten:
+        "A union of same-type primitive literals creates unnecessary union branches. Use z.literal([values...]) to produce one enum schema.",
+      flattenWithFix:
+        "A union of same-type primitive literals creates unnecessary union branches. Replace it with `{{replacement}}` to produce one enum schema.",
     },
     schema: [],
   },
@@ -61,7 +66,27 @@ const unionOfLiteralsToLiteralArray = {
         }
         const kinds = new Set(values.map((value) => primitiveLiteralKind(value!)));
         if (kinds.size === 1) {
-          context.report({ node: rawNode, messageId: "flatten" });
+          const callee = unwrapExpression(node.callee);
+          const edits: Array<TextEdit | undefined> = [replaceNode(callee?.property, "literal")];
+          for (const [index, value] of values.entries()) {
+            const literal = unwrapExpression(array.elements?.[index]);
+            edits.push(
+              removeRange(literal?.start, value?.start),
+              removeRange(value?.end, literal?.end),
+            );
+          }
+          const correction = correctionFromEdits(context.sourceCode.text, node, edits);
+
+          if (correction) {
+            context.report({
+              node: rawNode,
+              messageId: "flattenWithFix",
+              data: { replacement: correction.replacement },
+              fix: correction.fix,
+            });
+          } else {
+            context.report({ node: rawNode, messageId: "flatten" });
+          }
         }
       },
     };

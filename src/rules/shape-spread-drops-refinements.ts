@@ -27,7 +27,7 @@ const shapeSpreadDropsRefinements = {
     },
     messages: {
       dropsRefinement:
-        "Spreading `.shape` drops the base schema's refinements. Keep `.extend()` for this refined schema.",
+        "Spreading `{{base}}.shape` rebuilds the object and drops its refinements. Start from `{{base}}.extend({ ... })` so the base checks remain active.",
     },
     schema: [],
   },
@@ -68,7 +68,11 @@ const shapeSpreadDropsRefinements = {
           constructor?.type === "CallExpression" &&
           [...zodObjectConstructors].some((name) => isDirectZodCall(constructor, name, zod.roots))
         ) {
-          context.report({ node: rawNode, messageId: "dropsRefinement" });
+          context.report({
+            node: rawNode,
+            messageId: "dropsRefinement",
+            data: { base: base.name },
+          });
         }
       },
     };

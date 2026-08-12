@@ -8,6 +8,7 @@
  * Does not flag: the same issue with `path: ["a"]` or a pathless string issue. It also permits broad
  * whole-object invariants such as “at least one of a, b, or c.”
  */
+import { correctionFromEdits, type TextEdit } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   astSubtreeSome,
@@ -24,10 +25,7 @@ import {
   zodImportVisitor,
 } from "./zod-ast.ts";
 
-function conditionFieldCount(
-  ancestors: readonly AstNode[],
-  refinement: AstNode,
-): number | undefined {
+function conditionFields(ancestors: readonly AstNode[], refinement: AstNode): string[] | undefined {
   const refinementIndex = ancestors.indexOf(refinement);
   const callbackIndex = ancestors.findIndex(
     (ancestor, index) => index > refinementIndex && isFunctionNode(ancestor),
@@ -60,7 +58,7 @@ function conditionFieldCount(
     }
     return false;
   });
-  return fields.size;
+  return [...fields];
 }
 
 const crossFieldIssueWithoutPath = {
@@ -69,9 +67,13 @@ const crossFieldIssueWithoutPath = {
     docs: {
       description: "Require field paths on issues added by object refinements",
     },
+    hasSuggestions: true,
     messages: {
       missingPath:
-        "Attach a path to this cross-field issue so callers can identify the responsible field.",
+        'This issue depends on specific object fields but reports at the object root. Add `path: ["field"]` to the issue so callers can identify the field to correct.',
+      missingPathWithSuggestion:
+        "This issue depends on `{{field}}` but reports at the object root. Replace the issue with `{{replacement}}` so callers can identify the field to correct.",
+      useFieldPath: "Add path: [{{field}}] to this issue.",
     },
     schema: [],
   },
@@ -93,14 +95,38 @@ const crossFieldIssueWithoutPath = {
         const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
         const refinement = enclosingRefinementCall(ancestors);
         const receiver = methodReceiver(refinement);
-        const fieldCount = refinement ? conditionFieldCount(ancestors, refinement) : undefined;
+        const fields = refinement ? conditionFields(ancestors, refinement) : undefined;
         if (
-          fieldCount !== undefined &&
-          fieldCount > 0 &&
-          fieldCount <= 2 &&
+          fields !== undefined &&
+          fields.length > 0 &&
+          fields.length <= 2 &&
           zodObjectConstructors.has(zodRootConstructor(receiver, zod.roots) ?? "")
         ) {
-          context.report({ node: rawNode, messageId: "missingPath" });
+          const [field] = fields;
+          const insertion: TextEdit | undefined =
+            fields.length === 1 && issue.start !== undefined
+              ? {
+                  range: [issue.start + 1, issue.start + 1],
+                  text: ` path: [${JSON.stringify(field)}],`,
+                }
+              : undefined;
+          const correction = correctionFromEdits(context.sourceCode.text, issue, [insertion]);
+          if (field !== undefined && correction) {
+            context.report({
+              node: rawNode,
+              messageId: "missingPathWithSuggestion",
+              data: { field, replacement: correction.replacement },
+              suggest: [
+                {
+                  messageId: "useFieldPath",
+                  data: { field: JSON.stringify(field) },
+                  fix: correction.fix,
+                },
+              ],
+            });
+          } else {
+            context.report({ node: rawNode, messageId: "missingPath" });
+          }
         }
       },
     };

@@ -9,6 +9,7 @@
  * order-sensitive. The rule never suggests `z.httpUrl()`, and it preserves CUID and versioned UUID
  * formats exactly.
  */
+import { correctionFromEdits, replaceNode, sourceTextForNode } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   createZodImportState,
@@ -21,32 +22,32 @@ import {
 } from "./zod-ast.ts";
 
 const replacements = {
-  base64: "base64()",
-  base64url: "base64url()",
-  cidrv4: "cidrv4()",
-  cidrv6: "cidrv6()",
-  cuid: "cuid()",
-  cuid2: "cuid2()",
-  date: "iso.date()",
-  datetime: "iso.datetime()",
-  duration: "iso.duration()",
-  e164: "e164()",
-  email: "email()",
-  emoji: "emoji()",
-  guid: "guid()",
-  ipv4: "ipv4()",
-  ipv6: "ipv6()",
-  jwt: "jwt()",
-  ksuid: "ksuid()",
-  nanoid: "nanoid()",
-  time: "iso.time()",
-  ulid: "ulid()",
-  url: "url()",
-  uuid: "uuid()",
-  uuidv4: "uuidv4()",
-  uuidv6: "uuidv6()",
-  uuidv7: "uuidv7()",
-  xid: "xid()",
+  base64: "base64",
+  base64url: "base64url",
+  cidrv4: "cidrv4",
+  cidrv6: "cidrv6",
+  cuid: "cuid",
+  cuid2: "cuid2",
+  date: "iso.date",
+  datetime: "iso.datetime",
+  duration: "iso.duration",
+  e164: "e164",
+  email: "email",
+  emoji: "emoji",
+  guid: "guid",
+  ipv4: "ipv4",
+  ipv6: "ipv6",
+  jwt: "jwt",
+  ksuid: "ksuid",
+  nanoid: "nanoid",
+  time: "iso.time",
+  ulid: "ulid",
+  url: "url",
+  uuid: "uuid",
+  uuidv4: "uuidv4",
+  uuidv6: "uuidv6",
+  uuidv7: "uuidv7",
+  xid: "xid",
 } as const;
 
 const zod3StringFormatMethod = {
@@ -55,9 +56,12 @@ const zod3StringFormatMethod = {
     docs: {
       description: "Prefer Zod 4 top-level string format schemas",
     },
+    fixable: "code",
     messages: {
       deprecated:
-        "Zod 4 deprecates z.string().{{method}}(). Start with {{replacement}} and then apply any remaining string checks.",
+        "Zod 4 deprecates z.string().{{method}}(). Start with {{replacement}}(...) and then apply any remaining string checks.",
+      deprecatedWithFix:
+        "Zod 4 deprecates z.string().{{method}}(). Replace it with `{{replacement}}`; the top-level schema preserves first-class format metadata.",
     },
     schema: [],
   },
@@ -81,11 +85,32 @@ const zod3StringFormatMethod = {
             isMethodCall(node, method) &&
             isDirectZodCall(methodReceiver(node), "string", zod.roots)
           ) {
-            context.report({
-              node: rawNode,
-              messageId: "deprecated",
-              data: { method, replacement: `${root}.${replacement}` },
-            });
+            const stringConstructor = methodReceiver(node);
+            const argumentsText = (node.arguments ?? [])
+              .map((argument) => sourceTextForNode(context.sourceCode.text, argument) ?? "")
+              .join(", ");
+            const replacementText = `${root}.${replacement}(${argumentsText})`;
+            const correction =
+              (stringConstructor?.arguments?.length ?? 0) === 0
+                ? correctionFromEdits(context.sourceCode.text, node, [
+                    replaceNode(node, replacementText),
+                  ])
+                : undefined;
+
+            if (correction) {
+              context.report({
+                node: rawNode,
+                messageId: "deprecatedWithFix",
+                data: { method, replacement: correction.replacement },
+                fix: correction.fix,
+              });
+            } else {
+              context.report({
+                node: rawNode,
+                messageId: "deprecated",
+                data: { method, replacement: `${root}.${replacement}` },
+              });
+            }
             return;
           }
         }

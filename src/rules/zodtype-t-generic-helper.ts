@@ -37,7 +37,7 @@ const zodtypeTGenericHelper = {
     },
     messages: {
       preserveSchema:
-        "Accept `S extends z.ZodType` and return z.output<S>; z.ZodType<T> erases the schema's input type and concrete class.",
+        "z.ZodType<T> erases this parameter's input type and concrete schema class. Accept `S extends z.ZodType`, type the parameter as `S`, and return `z.output<S>`.",
     },
     schema: [],
   },

@@ -41,7 +41,10 @@ afterAll(async () => {
   await rm(fixtureDirectory, { recursive: true });
 });
 
-async function lint(code: string): Promise<{ exitCode: number; output: string }> {
+async function lint(
+  code: string,
+  flags: readonly string[] = [],
+): Promise<{ code: string; exitCode: number; output: string }> {
   fixtureNumber += 1;
   const fixturePath = join(fixtureDirectory, `fixture-${fixtureNumber}.ts`);
   await Bun.write(fixturePath, code);
@@ -50,6 +53,7 @@ async function lint(code: string): Promise<{ exitCode: number; output: string }>
       join(process.cwd(), "node_modules/.bin/oxlint"),
       "--config",
       join(fixtureDirectory, ".oxlintrc.json"),
+      ...flags,
       fixturePath,
     ],
     { stderr: "pipe", stdout: "pipe" },
@@ -59,7 +63,11 @@ async function lint(code: string): Promise<{ exitCode: number; output: string }>
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ]);
-  return { exitCode, output: stdout + stderr };
+  return {
+    code: await Bun.file(fixturePath).text(),
+    exitCode,
+    output: stdout + stderr,
+  };
 }
 
 describe("no-type-erasure", () => {
@@ -344,6 +352,70 @@ schema.string().uuidv7();
     expect(result.output).toContain("schema.uuidv6()");
     expect(result.output).toContain("schema.uuidv7()");
     expect(result.output).not.toContain("schema.cuid2()");
+  });
+
+  test("applies exact behavior-preserving corrections with --fix", async () => {
+    const result = await lint(
+      `
+import { z as schema } from "zod/v4";
+type User = { id: string };
+
+schema.number().positive().int();
+schema.object({ id: schema.string() }).strict();
+schema.string().optional().default("fallback");
+schema.union([schema.literal(1), schema.literal(2)]);
+type Parsed = schema.infer<typeof userSchema>;
+schema.string().uuidv4();
+const userSchema: schema.ZodType<User> = schema.object({ id: schema.string() });
+`,
+      ["--fix"],
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.code).toContain("schema.int().positive()");
+    expect(result.code).toContain("schema.strictObject({ id: schema.string() })");
+    expect(result.code).toContain('schema.string().default("fallback")');
+    expect(result.code).toContain("schema.literal([1, 2])");
+    expect(result.code).toContain("schema.output<typeof userSchema>");
+    expect(result.code).toContain("schema.uuidv4()");
+    expect(result.code).toContain(
+      "const userSchema = schema.object({ id: schema.string() }) satisfies schema.ZodType<User>",
+    );
+  });
+
+  test("reserves behavior-changing corrections for --fix-suggestions", async () => {
+    const source = `
+import { z } from "zod/v4";
+defineTool({
+  input: z.object({
+    pull_number: z.number(),
+    name: z.string().min(1).trim(),
+  }),
+});
+z.strictObject({ name: z.string() }).superRefine((value, ctx) => {
+  if (value.name === "") {
+    ctx.addIssue({ code: "custom", message: "name is required" });
+  }
+});
+z.string().refine((value) => new URL(value).hostname.length > 0);
+`;
+    const safeResult = await lint(source, ["--fix"]);
+
+    expect(safeResult.exitCode).toBe(1);
+    expect(safeResult.code).toBe(source);
+
+    const suggestedResult = await lint(source, ["--fix-suggestions"]);
+
+    expect(suggestedResult.exitCode).toBe(0);
+    expect(suggestedResult.code).toContain("input: z.strictObject({");
+    expect(suggestedResult.code).toContain("pull_number: z.int()");
+    expect(suggestedResult.code).toContain("name: z.string().trim().min(1)");
+    expect(suggestedResult.code).toContain(
+      'ctx.addIssue({ path: ["name"], code: "custom", message: "name is required" })',
+    );
+    expect(suggestedResult.code).toContain(
+      "(value) => { try { return new URL(value).hostname.length > 0; } catch { return false; } }",
+    );
   });
 });
 

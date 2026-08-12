@@ -54,7 +54,7 @@ const jsonParseArgumentOfSafeparse = {
     },
     messages: {
       codec:
-        "safeParse cannot catch JSON.parse while its argument is being evaluated. Parse through a JSON codec instead.",
+        "safeParse cannot catch JSON.parse while its argument is evaluated. Parse through a project JSON codec that converts SyntaxError into a Zod issue, then call `jsonCodec(schema).safeParse(text)`.",
     },
     schema: [],
   },

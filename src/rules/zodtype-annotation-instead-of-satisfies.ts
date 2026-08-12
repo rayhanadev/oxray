@@ -8,6 +8,12 @@
  * Does not flag: a schema that uses `satisfies` or a recursive declaration that needs an annotation.
  * It also permits an exported opaque schema or a mutable `let` declaration.
  */
+import {
+  correctionFromEdits,
+  removeRange,
+  sourceTextForNode,
+  type TextEdit,
+} from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   astSubtreeSome,
@@ -38,9 +44,12 @@ const zodtypeAnnotationInsteadOfSatisfies = {
     docs: {
       description: "Use satisfies for concrete Zod schema declarations",
     },
+    fixable: "code",
     messages: {
       preferSatisfies:
-        "Use `const schema = ... satisfies z.ZodType<T>` so the concrete schema methods and input type are preserved.",
+        "A z.ZodType<T> annotation widens this concrete schema. Move the contract to a satisfies expression so the schema methods and input type remain available.",
+      preferSatisfiesWithFix:
+        "A z.ZodType<T> annotation widens this concrete schema. Replace the declaration with `{{replacement}}` so the schema methods and input type remain available.",
     },
     schema: [],
   },
@@ -75,7 +84,33 @@ const zodtypeAnnotationInsteadOfSatisfies = {
             concreteSchemaConstructors.has(constructor) &&
             !selfReferences
           ) {
-            context.report({ node: rawNode, messageId: "preferSatisfies" });
+            const annotation = unwrapExpression(identifier?.typeAnnotation);
+            const contract = sourceTextForNode(
+              context.sourceCode.text,
+              unwrapExpression(annotation?.typeAnnotation),
+            );
+            const insertion: TextEdit | undefined =
+              declaration.init?.end === undefined || contract === undefined
+                ? undefined
+                : {
+                    range: [declaration.init.end, declaration.init.end],
+                    text: ` satisfies ${contract}`,
+                  };
+            const correction = correctionFromEdits(context.sourceCode.text, node, [
+              removeRange(annotation?.start, annotation?.end),
+              insertion,
+            ]);
+
+            if (correction) {
+              context.report({
+                node: rawNode,
+                messageId: "preferSatisfiesWithFix",
+                data: { replacement: correction.replacement },
+                fix: correction.fix,
+              });
+            } else {
+              context.report({ node: rawNode, messageId: "preferSatisfies" });
+            }
           }
         }
       },

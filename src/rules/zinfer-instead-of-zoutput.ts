@@ -6,6 +6,7 @@
  *
  * Does not flag: `type User = z.output<typeof userSchema>;` or `z.input<typeof userSchema>`.
  */
+import { correctionFromEdits, replaceNode } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import { createZodImportState, qualifiedTypeName, zodImportVisitor } from "./zod-ast.ts";
 
@@ -15,8 +16,12 @@ const zinferInsteadOfZoutput = {
     docs: {
       description: "Prefer direction-explicit z.output over z.infer",
     },
+    fixable: "code",
     messages: {
-      preferOutput: "Use z.output<typeof schema> instead of the direction-ambiguous z.infer alias.",
+      preferOutput:
+        "z.infer hides whether the type describes parsed output or accepted input. Use z.output<typeof schema> to name the parsed direction explicitly.",
+      preferOutputWithFix:
+        "z.infer hides whether the type describes parsed output or accepted input. Replace it with `{{replacement}}` to name the parsed direction explicitly.",
     },
     schema: [],
   },
@@ -25,9 +30,22 @@ const zinferInsteadOfZoutput = {
     return {
       ...zodImportVisitor(zod),
       TSTypeReference(rawNode) {
-        const name = qualifiedTypeName(rawNode as AstNode);
+        const node = rawNode as AstNode;
+        const name = qualifiedTypeName(node);
         if (name && zod.roots.has(name.namespace) && name.name === "infer") {
-          context.report({ node: rawNode, messageId: "preferOutput" });
+          const correction = correctionFromEdits(context.sourceCode.text, node, [
+            replaceNode(node.typeName?.right, "output"),
+          ]);
+          if (correction) {
+            context.report({
+              node: rawNode,
+              messageId: "preferOutputWithFix",
+              data: { replacement: correction.replacement },
+              fix: correction.fix,
+            });
+          } else {
+            context.report({ node: rawNode, messageId: "preferOutput" });
+          }
         }
       },
     };

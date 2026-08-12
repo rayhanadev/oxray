@@ -1,6 +1,11 @@
 import type { RuleTester } from "oxlint/plugins-dev";
 
 export type OxlintRule = Parameters<RuleTester["run"]>[1];
+type OxlintCreate = Exclude<OxlintRule["create"], undefined>;
+export type OxlintContext = Parameters<OxlintCreate>[0];
+type OxlintDiagnostic = Parameters<OxlintContext["report"]>[0];
+export type OxlintFix = NonNullable<OxlintDiagnostic["fix"]>;
+export type OxlintReportNode = NonNullable<OxlintDiagnostic["node"]>;
 
 export interface AstNode {
   alternate?: AstNode | null;
