@@ -48,6 +48,7 @@ async function activeNodeTypesPackage(cwd: string): Promise<string> {
   );
 }
 
+/** Selects Node.js types from project declarations before it uses the active runtime version. */
 export async function resolveNodeTypesPackage(
   cwd: string,
   packageJson: ProjectPackageJson,

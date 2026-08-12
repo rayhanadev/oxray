@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Resolves Zod syntax for rules that inspect schema chains and tool inputs.
+ *
+ * The helpers track actual Zod 4 imports. They also unwrap transparent TypeScript expressions so
+ * rules do not mistake unrelated builders for Zod schemas.
+ */
 import type { AstNode } from "./types.ts";
 
 export interface ZodImportState {
@@ -16,6 +22,7 @@ const transparentExpressionTypes = new Set([
 
 export const zodObjectConstructors = new Set(["looseObject", "object", "strictObject"]);
 
+/** Creates isolated import state because each linted program can bind Zod to different names. */
 export function createZodImportState(): ZodImportState {
   return { roots: new Set() };
 }
@@ -24,6 +31,7 @@ function isZod4Source(source: AstNode["value"]): boolean {
   return source === "zod" || source === "zod/v4" || source === "zod/v4/classic";
 }
 
+/** Collects local Zod 4 bindings while excluding explicit Zod 3 imports. */
 export function collectZodImports(program: AstNode, state: ZodImportState): void {
   state.roots.clear();
   const statements = Array.isArray(program.body) ? program.body : [];
@@ -49,6 +57,7 @@ export function collectZodImports(program: AstNode, state: ZodImportState): void
   }
 }
 
+/** Provides a Program visitor so rules can compose import discovery with other visitors. */
 export function zodImportVisitor(state: ZodImportState): {
   Program: (node: unknown) => void;
 } {
@@ -59,14 +68,17 @@ export function zodImportVisitor(state: ZodImportState): {
   };
 }
 
+/** Removes transparent wrappers because they do not change the underlying Zod expression. */
 export function unwrapExpression(node: AstNode | null | undefined): AstNode | undefined {
   let current = node ?? undefined;
   while (current && transparentExpressionTypes.has(current.type)) {
-    current = current.expression;
+    const expression = current.expression;
+    current = Object(expression) === expression ? (expression as AstNode) : undefined;
   }
   return current;
 }
 
+/** Searches known AST children while preventing cycles from malformed or extended syntax trees. */
 export function astSubtreeSome(
   node: AstNode | null | undefined,
   predicate: (candidate: AstNode) => boolean,
@@ -117,12 +129,13 @@ export function astSubtreeSome(
       ...(candidate.properties ?? []),
       ...(candidate.specifiers ?? []),
     ];
-    return children.some(visit);
+    return children.some((child) => Object(child) === child && visit(child as AstNode));
   }
 
   return visit(node);
 }
 
+/** Reads identifier and literal property names because both forms are equivalent in ESTree. */
 export function propertyName(node: AstNode | null | undefined): string | undefined {
   const current = unwrapExpression(node);
   if (current?.type === "Identifier") {
@@ -134,11 +147,13 @@ export function propertyName(node: AstNode | null | undefined): string | undefin
   return undefined;
 }
 
+/** Returns a member property name after the analysis removes transparent wrappers. */
 export function memberName(node: AstNode | null | undefined): string | undefined {
   const current = unwrapExpression(node);
   return current?.type === "MemberExpression" ? propertyName(current.property) : undefined;
 }
 
+/** Returns the stable name for direct and member call targets. */
 export function calleeName(node: AstNode | null | undefined): string | undefined {
   const current = unwrapExpression(node);
   if (current?.type === "Identifier") {
@@ -147,17 +162,20 @@ export function calleeName(node: AstNode | null | undefined): string | undefined
   return memberName(current);
 }
 
+/** Matches one method call without assuming that its receiver is Zod. */
 export function isMethodCall(node: AstNode | null | undefined, method: string): boolean {
   const current = unwrapExpression(node);
   return current?.type === "CallExpression" && memberName(current.callee) === method;
 }
 
+/** Returns a method receiver so callers can continue walking a fluent chain. */
 export function methodReceiver(node: AstNode | null | undefined): AstNode | undefined {
   const current = unwrapExpression(node);
   const callee = unwrapExpression(current?.callee);
   return callee?.type === "MemberExpression" ? unwrapExpression(callee.object) : undefined;
 }
 
+/** Matches a direct constructor only when its root resolves to a tracked Zod import. */
 export function isDirectZodCall(
   node: AstNode | null | undefined,
   name: string,
@@ -176,6 +194,7 @@ export function isDirectZodCall(
   );
 }
 
+/** Finds the tracked import name at the head of a fluent Zod chain. */
 export function zodRootIdentifier(
   node: AstNode | null | undefined,
   roots: ReadonlySet<string>,
@@ -197,6 +216,7 @@ export function zodRootIdentifier(
   return zodRootIdentifier(object, roots);
 }
 
+/** Finds the first Zod constructor name so rules can classify the schema family. */
 export function zodRootConstructor(
   node: AstNode | null | undefined,
   roots: ReadonlySet<string>,
@@ -218,6 +238,7 @@ export function zodRootConstructor(
   return zodRootConstructor(object, roots);
 }
 
+/** Finds selected calls in one fluent chain without traversing callback bodies. */
 export function chainHasMethod(
   node: AstNode | null | undefined,
   methods: ReadonlySet<string>,
@@ -236,6 +257,7 @@ export function chainHasMethod(
   return (name !== undefined && methods.has(name)) || chainHasMethod(callee.object, methods);
 }
 
+/** Checks an object literal for one explicit property because spreads cannot prove its presence. */
 export function hasProperty(node: AstNode | null | undefined, name: string): boolean {
   const current = unwrapExpression(node);
   return (
@@ -246,6 +268,7 @@ export function hasProperty(node: AstNode | null | undefined, name: string): boo
   );
 }
 
+/** Splits a namespace-qualified type so rules can recognize forms such as `z.output`. */
 export function qualifiedTypeName(
   node: AstNode | null | undefined,
 ): { namespace: string; name: string } | undefined {
@@ -266,6 +289,7 @@ export function qualifiedTypeName(
   return { namespace: left.name, name: right.name };
 }
 
+/** Identifies function syntax that can act as a refinement callback. */
 export function isFunctionNode(node: AstNode | null | undefined): boolean {
   return (
     node?.type === "ArrowFunctionExpression" ||
@@ -274,6 +298,7 @@ export function isFunctionNode(node: AstNode | null | undefined): boolean {
   );
 }
 
+/** Finds the refinement call that owns a callback because outer try blocks do not protect it. */
 export function enclosingRefinementCall(ancestors: readonly AstNode[]): AstNode | undefined {
   for (let index = ancestors.length - 1; index >= 0; index -= 1) {
     const callback = ancestors[index];
@@ -290,6 +315,7 @@ export function enclosingRefinementCall(ancestors: readonly AstNode[]): AstNode 
   return undefined;
 }
 
+/** Checks whether the current node is inside a try body rather than its handler or finalizer. */
 export function isInsideTryBlock(ancestors: readonly AstNode[]): boolean {
   return ancestors.some((ancestor, index) => {
     if (ancestor.type !== "TryStatement") {
@@ -299,6 +325,7 @@ export function isInsideTryBlock(ancestors: readonly AstNode[]): boolean {
   });
 }
 
+/** Accepts only primitive literals because array literal unions need one JSON scalar family. */
 export function isPrimitiveLiteral(node: AstNode | null | undefined): boolean {
   const current = unwrapExpression(node);
   if (current?.type !== "Literal") {
@@ -308,6 +335,7 @@ export function isPrimitiveLiteral(node: AstNode | null | undefined): boolean {
   return current.value === null || [Boolean, Number, String].includes(constructor as never);
 }
 
+/** Returns a primitive family so a rewrite cannot combine incompatible literal types. */
 export function primitiveLiteralKind(node: AstNode): string {
   if (node.value === null) {
     return "null";
@@ -322,11 +350,13 @@ export function primitiveLiteralKind(node: AstNode): string {
   return "string";
 }
 
+/** Recognizes the two repository tool factories that expose model-facing input schemas. */
 export function isToolDefinitionCall(node: AstNode | null | undefined): boolean {
   const name = calleeName(unwrapExpression(node)?.callee);
   return name === "defineTool" || name === "defineDomainTool";
 }
 
+/** Checks whether a property directly defines input for a recognized tool factory. */
 export function isToolInputProperty(property: AstNode, ancestors: readonly AstNode[]): boolean {
   if (
     property.type !== "Property" ||
@@ -340,6 +370,7 @@ export function isToolInputProperty(property: AstNode, ancestors: readonly AstNo
   return parent?.type === "CallExpression" && isToolDefinitionCall(parent);
 }
 
+/** Checks nested schema nodes against the nearest recognized tool input boundary. */
 export function isInsideToolInput(ancestors: readonly AstNode[]): boolean {
   for (let index = ancestors.length - 1; index >= 2; index -= 1) {
     const property = ancestors[index];

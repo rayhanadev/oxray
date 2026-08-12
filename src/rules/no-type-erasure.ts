@@ -1,7 +1,8 @@
 /**
- * Detects broad TypeScript object types and generic `isRecord` calls that erase known properties,
- * because that lost shape forces downstream code to recover type information with casts or
- * repetitive runtime checks.
+ * @fileoverview Preserves concrete TypeScript object information at runtime boundaries.
+ *
+ * Detects broad TypeScript object types and generic `isRecord` calls. These forms erase known
+ * properties and force later code to recover information with casts or repeated checks.
  *
  * Flags: `type Data = Record<string, unknown>;` and `isRecord(value);`
  *
@@ -36,7 +37,8 @@ function isBroadStringIndex(node: AstNode): boolean {
 
 function calleeName(node: AstNode | undefined): string | undefined {
   if (node?.type === "ChainExpression") {
-    return calleeName(node.expression);
+    const expression = node.expression;
+    return Object(expression) === expression ? calleeName(expression as AstNode) : undefined;
   }
 
   if (node?.type === "Identifier") {

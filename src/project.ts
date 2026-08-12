@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Inspects project files before Oxray chooses a runtime or edits configuration.
+ *
+ * Runtime inference combines independent signals. It returns no choice when those signals conflict,
+ * which lets the command ask the user instead of guessing.
+ */
 import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -35,6 +41,7 @@ const alternativeConfigs = [
   "oxfmt.config.cjs",
 ] as const;
 
+/** Checks a project signal without exposing missing-file errors to runtime inference. */
 export async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -44,6 +51,7 @@ export async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+/** Reads project metadata once so runtime and package-manager decisions use consistent evidence. */
 export async function inspectProject(cwd: string): Promise<Project> {
   const packageJsonPath = join(cwd, "package.json");
   if (!(await pathExists(packageJsonPath))) {
@@ -84,6 +92,7 @@ function hasDependency(packageJson: ProjectPackageJson, dependency: string): boo
   ].some((group) => group?.[dependency] !== undefined);
 }
 
+/** Infers one runtime only when project signals agree, so ambiguous projects can ask the user. */
 export async function inferRuntime(
   cwd: string,
   packageJson: ProjectPackageJson,

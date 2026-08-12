@@ -1,6 +1,6 @@
 /**
- * Detects deprecated Zod 3 string-format methods on chains rooted at `z.string()`, because Zod 4
- * exposes formats as top-level schemas with clearer intent and first-class format metadata.
+ * Detects deprecated Zod 3 string-format methods on chains rooted at `z.string()`. Zod 4 exposes
+ * formats as top-level schemas with clearer intent and first-class format metadata.
  *
  * Flags: `z.string().url()`, `z.string().email()`, and `z.string().datetime()`
  *

@@ -1,13 +1,14 @@
 /**
- * Detects unprotected throwing operations such as `new URL`, `JSON.parse`, `BigInt`,
- * `decodeURIComponent`, and `new RegExp` inside Zod refinement callbacks, because refinements must
- * return validation results rather than let exceptions escape even from `safeParse`.
+ * @fileoverview Prevents exceptions from escaping Zod refinement callbacks.
+ *
+ * Detects unprotected throwing operations inside Zod refinement callbacks. Refinements must return
+ * validation results because an exception can escape even from `safeParse`.
  *
  * Flags: `z.string().refine((value) => new URL(value).protocol === "https:")`
  *
- * Does not flag: a throwing operation wrapped by `try/catch` inside the callback, `new URL` reached
- * only after an aborting URL-format check or fatal `URL.canParse` guard, or a guarded
- * `z.stringFormat()` predicate. A `try` around schema construction does not count as protection.
+ * Does not flag: an operation inside a callback `try/catch` or after an aborting format check. It
+ * also permits a guarded `z.stringFormat()` predicate. A `try` around schema construction does not
+ * protect the callback.
  */
 import type { AstNode, OxlintRule } from "./types.ts";
 import {

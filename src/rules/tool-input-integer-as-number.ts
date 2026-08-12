@@ -1,7 +1,6 @@
 /**
- * Detects `z.number()` on high-confidence integer-like keys inside `defineTool` and
- * `defineDomainTool` inputs, because identifiers, counts, page sizes, and record numbers should emit
- * `type: "integer"` to the model and reject fractional values at runtime.
+ * Detects `z.number()` on high-confidence integer keys inside tool inputs. Identifiers, counts,
+ * page sizes, and record numbers should reject fractional values and emit `type: "integer"`.
  *
  * Flags: `defineTool({ input: z.strictObject({ pull_number: z.number() }) })`
  *

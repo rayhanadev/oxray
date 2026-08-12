@@ -1,7 +1,6 @@
 /**
- * Detects generic helper parameters written as `z.ZodType<T>` where `T` is the function's type
- * parameter, because that form preserves only the output and erases the schema's input type and
- * concrete class; helpers should be generic over the schema itself.
+ * Detects generic helper parameters written as `z.ZodType<T>`. That form preserves only the output
+ * and erases the schema input type and concrete class. Helpers should use the schema as the generic.
  *
  * Flags: `function parse<T>(schema: z.ZodType<T>): T { return schema.parse(value); }`
  *

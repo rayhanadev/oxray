@@ -1,6 +1,6 @@
 /**
- * Detects the `z.infer` type alias, because `z.output` is runtime-equivalent but states explicitly
- * that the post-parse type is wanted and stays clear if the schema later gains a transform or codec.
+ * Detects the `z.infer` type alias. `z.output` is equivalent and explicitly names the post-parse
+ * direction. That distinction remains clear when the schema gains a transform or codec.
  *
  * Flags: `type User = z.infer<typeof userSchema>;`
  *

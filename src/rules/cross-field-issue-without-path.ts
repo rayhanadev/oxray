@@ -1,12 +1,12 @@
 /**
- * Detects field-targeted `ctx.addIssue()` calls without a `path` inside direct Zod object
- * refinements, because an unattributed error hides which one or two fields the condition asks the
- * caller to correct. Broad whole-object invariants spanning three or more fields stay top-level.
+ * Detects field-targeted `ctx.addIssue()` calls without a `path` in direct object refinements. An
+ * unattributed error hides the fields that the caller must correct. Broad invariants stay
+ * top-level.
  *
  * Flags: `z.strictObject({ a: z.string() }).superRefine((v, ctx) => { if (v.a === "") ctx.addIssue({ code: "custom", message: "invalid a" }); });`
  *
- * Does not flag: the same issue with `path: ["a"]`, a pathless issue on a string refinement where
- * Zod supplies the containing field path, or “at least one of a, b, or c” whole-object invariants.
+ * Does not flag: the same issue with `path: ["a"]` or a pathless string issue. It also permits broad
+ * whole-object invariants such as “at least one of a, b, or c.”
  */
 import type { AstNode, OxlintRule } from "./types.ts";
 import {

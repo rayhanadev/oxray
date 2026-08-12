@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+/** Creates isolated project fixtures so tests cannot change the working repository. */
 export function createTemporaryProjects(prefix: string, packageJson: string) {
   const directories: string[] = [];
 

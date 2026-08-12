@@ -26,6 +26,7 @@ interface OxclippyPreset {
   rules: { [ruleName: string]: RuleSetting };
 }
 
+/** Loads published preset entries because oxclippy remains the authority for its rule groups. */
 export function loadOxclippyRules(
   cwd: string,
   presetNames: readonly OxclippyPresetName[],

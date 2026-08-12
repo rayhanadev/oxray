@@ -1,7 +1,6 @@
 /**
- * Detects `.shape` spreads from a locally declared object schema carrying `.refine()`,
- * `.superRefine()`, or `.check()`, because rebuilding an object from its shape silently drops those
- * refinements even though the keys and inferred shape still look correct.
+ * Detects `.shape` spreads from a local object schema that has refinements. Rebuilding the object
+ * silently drops those checks even though its keys and inferred shape remain unchanged.
  *
  * Flags: `z.strictObject({ ...refinedBase.shape, extra: z.string() })`
  *

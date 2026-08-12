@@ -27,7 +27,9 @@ Oxray:
 - Installs the matching Bun or Node.js type definitions.
 - Adds `lint` and `format` package scripts.
 - Creates or updates `.oxlintrc.json` and `.oxfmtrc.json` without replacing unrelated settings or JSONC comments.
+- Creates or updates an Oxray-owned section in `AGENTS.md` without replacing project guidance.
 - Enables the TypeScript, Unicorn, and Oxc lint plugins.
+- Enables comment and API documentation policy with advisory checks separated from blocking checks.
 - Enables import, `package.json`, and Tailwind CSS sorting.
 
 Running ox again with the same choices is safe and does not duplicate configuration.

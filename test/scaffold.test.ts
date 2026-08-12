@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { parse } from "jsonc-parser";
 
 import packageJson from "../package.json" with { type: "json" };
-import { personalRuleNames } from "../src/rule-names.ts";
+import { personalRuleDefaults, personalRuleNames } from "../src/rule-names.ts";
 import { applyScaffold, type ScaffoldOperations } from "../src/scaffold.ts";
 import { createTemporaryProjects } from "./temporary-projects.ts";
 
@@ -65,12 +65,14 @@ describe("project scaffolding", () => {
     expect(initializedPackages).toEqual(["oxlint", "oxfmt"]);
 
     const packageJsonPath = join(directory, "package.json");
+    const agentsPath = join(directory, "AGENTS.md");
     const oxlintPath = join(directory, ".oxlintrc.json");
     const oxfmtPath = join(directory, ".oxfmtrc.json");
     const firstPass = await Promise.all([
       readFile(packageJsonPath, "utf8"),
       readFile(oxlintPath, "utf8"),
       readFile(oxfmtPath, "utf8"),
+      readFile(agentsPath, "utf8"),
     ]);
     const targetPackageJson = JSON.parse(firstPass[0]);
     const oxlint = parse(firstPass[1]);
@@ -86,13 +88,16 @@ describe("project scaffolding", () => {
       { name: "rayhanadev", specifier: "@rayhanadev/ox" },
     ]);
     for (const ruleName of personalRuleNames) {
-      expect(oxlint.rules[`rayhanadev/${ruleName}`]).toBe("error");
+      expect(oxlint.rules[`rayhanadev/${ruleName}`]).toBe(personalRuleDefaults[ruleName]);
     }
+    expect(oxlint.options.reportUnusedDisableDirectives).toBe("error");
     expect(oxlint.rules["oxclippy/needless-bool"]).toBe("warn");
     expect(oxfmt.sortImports).toBe(true);
+    expect(oxfmt.ignorePatterns).toEqual(["AGENTS.md"]);
     expect(oxfmt.sortPackageJson).toBe(true);
     expect(oxfmt.sortTailwindcss).toBe(true);
-    expect(await Bun.file(join(directory, "AGENTS.md")).exists()).toBe(false);
+    expect(firstPass[3]).toContain("<!-- oxray:comments:start -->");
+    expect(firstPass[3]).toContain("<!-- oxray:comments:start -->\n## Comments and documentation");
     expect(await Bun.file(join(directory, "CLAUDE.md")).exists()).toBe(false);
 
     await applyScaffold(options, operations);
@@ -100,6 +105,7 @@ describe("project scaffolding", () => {
       readFile(packageJsonPath, "utf8"),
       readFile(oxlintPath, "utf8"),
       readFile(oxfmtPath, "utf8"),
+      readFile(agentsPath, "utf8"),
     ]);
 
     expect(secondPass).toEqual(firstPass);

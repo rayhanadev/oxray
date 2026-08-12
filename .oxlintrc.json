@@ -5,21 +5,30 @@
     "correctness": "error"
   },
   "options": {
-    "typeAware": true
+    "typeAware": true,
+    "reportUnusedDisableDirectives": "error"
   },
   "env": {
     "builtin": true
   },
   "jsPlugins": ["./src/plugin.ts"],
   "rules": {
+    "rayhanadev/comment-explains-why": "warn",
+    "rayhanadev/comment-ste100": "error",
+    "rayhanadev/comment-ste100-heuristics": "warn",
+    "rayhanadev/commented-out-code-requires-reason": "error",
+    "rayhanadev/complex-file-header": "warn",
     "rayhanadev/cross-field-issue-without-path": "error",
+    "rayhanadev/domain-knowledge-in-agents": "error",
     "rayhanadev/json-parse-argument-of-safeparse": "error",
+    "rayhanadev/lint-suppression-requires-reason": "error",
     "rayhanadev/no-type-erasure": "error",
     "rayhanadev/no-typeof": "error",
     "rayhanadev/number-int-method": "error",
     "rayhanadev/object-strict-method": "error",
     "rayhanadev/optional-default-redundant": "error",
     "rayhanadev/record-string-unknown": "error",
+    "rayhanadev/require-jsdoc-comments": "error",
     "rayhanadev/shape-spread-drops-refinements": "error",
     "rayhanadev/throwing-zod-refine": "error",
     "rayhanadev/tool-input-integer-as-number": "error",

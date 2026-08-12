@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { addDevDependency, dlx, type PackageManager, type PackageManagerName } from "nypm";
 
 import packageJson from "../package.json" with { type: "json" };
+import { mergeAgentsGuidance } from "./agents-guidance.ts";
 import { mergeOxfmtConfig, mergeOxlintConfig, mergePackageJson } from "./json-config.ts";
 import { resolveNodeTypesPackage } from "./node-types.ts";
 import { loadOxclippyRules, type OxclippyPresetName } from "./oxclippy-presets.ts";
@@ -58,6 +59,7 @@ async function writeIfChanged(path: string, original: string, next: string): Pro
   }
 }
 
+/** Installs and merges the selected toolchain so repeated setup remains safe. */
 export async function applyScaffold(
   options: ScaffoldOptions,
   operations: ScaffoldOperations = defaultScaffoldOperations,
@@ -87,17 +89,20 @@ export async function applyScaffold(
 
   const oxclippyRules = operations.loadOxclippyRules(cwd, presets);
   const packageJsonPath = join(cwd, "package.json");
+  const agentsPath = join(cwd, "AGENTS.md");
   const oxlintPath = join(cwd, ".oxlintrc.json");
   const oxfmtPath = join(cwd, ".oxfmtrc.json");
-  const [packageJsonText, oxlintText, oxfmtText] = await Promise.all([
+  const [packageJsonText, oxlintText, oxfmtText, agentsText] = await Promise.all([
     readFile(packageJsonPath, "utf8"),
     readFile(oxlintPath, "utf8"),
     readFile(oxfmtPath, "utf8"),
+    pathExists(agentsPath).then((exists) => (exists ? readFile(agentsPath, "utf8") : "")),
   ]);
 
   await Promise.all([
     writeIfChanged(packageJsonPath, packageJsonText, mergePackageJson(packageJsonText)),
     writeIfChanged(oxlintPath, oxlintText, mergeOxlintConfig(oxlintText, oxclippyRules)),
     writeIfChanged(oxfmtPath, oxfmtText, mergeOxfmtConfig(oxfmtText)),
+    writeIfChanged(agentsPath, agentsText, mergeAgentsGuidance(agentsText)),
   ]);
 }
