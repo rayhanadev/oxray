@@ -10,12 +10,7 @@ const transparentTypeScriptExpressionTypes = new Set([
 
 /** Identifies ESTree-compatible nodes without chaining type assertions. */
 export function isAstNode(value: unknown): value is AstNode {
-  return (
-    value !== null &&
-    Object(value) === value &&
-    !Array.isArray(value) &&
-    Reflect.has(Object(value), "type")
-  );
+  return value !== null && !Array.isArray(value) && Reflect.has(Object(value), "type");
 }
 
 /** Returns only ESTree-compatible values from an Oxlint node collection. */

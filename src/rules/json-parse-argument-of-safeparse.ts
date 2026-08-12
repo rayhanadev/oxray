@@ -1,35 +1,25 @@
 /**
- * Detects unguarded `schema.safeParse(JSON.parse(text))`, because JavaScript evaluates `JSON.parse`
- * before calling `safeParse`, so malformed JSON throws a raw `SyntaxError` instead of returning a
- * failed Zod result.
+ * Detects `schema.safeParse(JSON.parse(text))`. Malformed JSON throws before `safeParse` can return
+ * a failed Zod result.
  *
  * Flags: `schema.safeParse(JSON.parse(text))`
  *
- * Does not flag: the same call inside a `try` block, a compile-time string literal confirmed to be
- * valid JSON, or `jsonCodec(schema).safeParse(text)`.
+ * Does not flag: calls inside `try` blocks or compile-time string literals that contain valid JSON.
  */
 import { astNodes } from "./ast-nodes.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   createZodImportState,
+  isIdentifierMember,
   isInsideTryBlock,
   isMethodCall,
-  memberName,
   unwrapExpression,
   zodImportVisitor,
 } from "./zod-ast.ts";
 
 function isJsonParse(node: AstNode | null | undefined): boolean {
   const current = unwrapExpression(node);
-  const callee = unwrapExpression(current?.callee);
-  const object = unwrapExpression(callee?.object);
-  return (
-    current?.type === "CallExpression" &&
-    callee?.type === "MemberExpression" &&
-    object?.type === "Identifier" &&
-    object.name === "JSON" &&
-    memberName(callee) === "parse"
-  );
+  return current?.type === "CallExpression" && isIdentifierMember(current.callee, "JSON", "parse");
 }
 
 function parsesKnownValidJson(node: AstNode | null | undefined): boolean {
@@ -55,7 +45,7 @@ const jsonParseArgumentOfSafeparse = {
     },
     messages: {
       codec:
-        "safeParse cannot catch JSON.parse while its argument is evaluated. Parse through a project JSON codec that converts SyntaxError into a Zod issue, then call `jsonCodec(schema).safeParse(text)`.",
+        "safeParse cannot catch JSON.parse while its argument is evaluated. Parse at the I/O boundary, preserve failure explicitly, then validate the successful value.",
     },
     schema: [],
   },

@@ -16,12 +16,14 @@ import lintSuppressionRequiresReason from "./rules/lint-suppression-requires-rea
 import noChainedTypeAssertions from "./rules/no-chained-type-assertions.ts";
 import noConditionalEmptyObjectSpread from "./rules/no-conditional-empty-object-spread.ts";
 import noExportedFunctionExpressions from "./rules/no-exported-function-expressions.ts";
+import noJsonParseStringifyCodec from "./rules/no-json-parse-stringify-codec.ts";
 import noKnownValueWidening from "./rules/no-known-value-widening.ts";
 import noTypeErasure from "./rules/no-type-erasure.ts";
 import noTypeof from "./rules/no-typeof.ts";
 import noUnknownTypeAliases from "./rules/no-unknown-type-aliases.ts";
 import noUnsafeDictionaryType from "./rules/no-unsafe-dictionary-type.ts";
 import noWidenThenAssert from "./rules/no-widen-then-assert.ts";
+import noZodTypeErasure from "./rules/no-zod-type-erasure.ts";
 import numberIntMethod from "./rules/number-int-method.ts";
 import objectStrictMethod from "./rules/object-strict-method.ts";
 import optionalDefaultRedundant from "./rules/optional-default-redundant.ts";
@@ -58,12 +60,14 @@ const rules = {
   "no-chained-type-assertions": noChainedTypeAssertions,
   "no-conditional-empty-object-spread": noConditionalEmptyObjectSpread,
   "no-exported-function-expressions": noExportedFunctionExpressions,
+  "no-json-parse-stringify-codec": noJsonParseStringifyCodec,
   "no-known-value-widening": noKnownValueWidening,
   "no-type-erasure": noTypeErasure,
   "no-typeof": noTypeof,
   "no-unknown-type-aliases": noUnknownTypeAliases,
   "no-unsafe-dictionary-type": noUnsafeDictionaryType,
   "no-widen-then-assert": noWidenThenAssert,
+  "no-zod-type-erasure": noZodTypeErasure,
   "number-int-method": numberIntMethod,
   "object-strict-method": objectStrictMethod,
   "optional-default-redundant": optionalDefaultRedundant,
