@@ -9,6 +9,8 @@ describe("AGENTS.md guidance", () => {
     expect(first).toContain("<!-- oxray:comments:start -->");
     expect(first).toContain("<!-- oxray:comments:start -->\n## Comments and documentation");
     expect(first).toContain("## Comments and documentation");
+    expect(first).toContain("## Responding to lint diagnostics");
+    expect(first).toContain("`oxlint --fix-suggestions`");
     expect(mergeAgentsGuidance(first)).toBe(first);
   });
 

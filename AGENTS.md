@@ -106,6 +106,13 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 
 You must never disable or suppress lint rules.
 
+## Release versioning
+
+- Use patch changesets when you add, remove, or revise lint rules.
+- Use minor changesets when you add features or revise how Ox itself works.
+- Lint correction infrastructure is an Ox feature and requires a minor changeset.
+- Classify each changeset by its highest-impact change.
+
 <!-- oxray:comments:start -->
 ## Comments and documentation
 
@@ -137,4 +144,12 @@ Delete commented-out implementation code or move it to a JSDoc example.
 If disabled code must remain, add `KEPT: <reason>` immediately before it.
 
 If the ASD-STE100 skill is available, use it when you write or revise substantial documentation.
+
+## Responding to lint diagnostics
+
+- Apply the exact replacement when a diagnostic provides one.
+- Run `oxlint --fix` for corrections that preserve runtime behavior.
+- Review each change before you run `oxlint --fix-suggestions`.
+- Replace diagnostic placeholders with project-specific names and types.
+- Run Oxfmt and Oxlint after each correction.
 <!-- oxray:comments:end -->

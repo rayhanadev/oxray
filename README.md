@@ -34,6 +34,14 @@ Oxray:
 
 Running ox again with the same choices is safe and does not duplicate configuration.
 
+## Lint corrections
+
+Oxray diagnostics explain the failed invariant and show corrected code when the rule can derive it.
+
+- Run `oxlint --fix` to apply corrections that preserve runtime behavior.
+- Run `oxlint --fix-suggestions` only after reviewing corrections that tighten validation.
+- Run Oxfmt and Oxlint after applying either correction class.
+
 ## Oxclippy presets
 
 Choose how much of oxclippy to enable during setup:

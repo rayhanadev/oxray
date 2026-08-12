@@ -175,6 +175,21 @@ export function methodReceiver(node: AstNode | null | undefined): AstNode | unde
   return callee?.type === "MemberExpression" ? unwrapExpression(callee.object) : undefined;
 }
 
+/** Finds one named call while walking from the end of a fluent chain to its root. */
+export function methodCallInChain(
+  node: AstNode | null | undefined,
+  method: string,
+): AstNode | undefined {
+  const current = unwrapExpression(node);
+  if (current?.type !== "CallExpression") {
+    return undefined;
+  }
+  if (memberName(current.callee) === method) {
+    return current;
+  }
+  return methodCallInChain(methodReceiver(current), method);
+}
+
 /** Matches a direct constructor only when its root resolves to a tracked Zod import. */
 export function isDirectZodCall(
   node: AstNode | null | undefined,
@@ -216,11 +231,11 @@ export function zodRootIdentifier(
   return zodRootIdentifier(object, roots);
 }
 
-/** Finds the first Zod constructor name so rules can classify the schema family. */
-export function zodRootConstructor(
+/** Finds the constructor call at the root of a tracked fluent Zod chain. */
+export function zodRootCall(
   node: AstNode | null | undefined,
   roots: ReadonlySet<string>,
-): string | undefined {
+): AstNode | undefined {
   const current = unwrapExpression(node);
   if (current?.type !== "CallExpression") {
     return undefined;
@@ -233,9 +248,17 @@ export function zodRootConstructor(
 
   const object = unwrapExpression(callee.object);
   if (object?.type === "Identifier" && object.name !== undefined && roots.has(object.name)) {
-    return memberName(callee);
+    return current;
   }
-  return zodRootConstructor(object, roots);
+  return zodRootCall(object, roots);
+}
+
+/** Finds the first Zod constructor name so rules can classify the schema family. */
+export function zodRootConstructor(
+  node: AstNode | null | undefined,
+  roots: ReadonlySet<string>,
+): string | undefined {
+  return memberName(zodRootCall(node, roots)?.callee);
 }
 
 /** Finds selected calls in one fluent chain without traversing callback bodies. */

@@ -16,7 +16,7 @@ const noTypeof = {
     },
     messages: {
       forbidden:
-        "Avoid typeof checks. Use a domain-specific type guard that preserves concrete type information.",
+        "A runtime typeof check only narrows the JavaScript representation; it does not establish the domain contract. Parse external input at its boundary, or use an internal union's discriminant.",
     },
     schema: [],
   },

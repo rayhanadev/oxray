@@ -23,7 +23,7 @@ const recordStringUnknown = {
     },
     messages: {
       broadRecord:
-        "Tool arguments cross a JSON boundary, so this value cannot be arbitrary JavaScript. Use a concrete projection, or z.json() after checking its recursive-schema cost.",
+        "Tool arguments cross a JSON boundary, so z.unknown() promises values the model cannot send. Replace it with a concrete value schema, or use z.json() after reviewing recursive-schema support.",
     },
     schema: [],
   },

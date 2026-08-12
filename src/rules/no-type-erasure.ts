@@ -67,11 +67,11 @@ const noTypeErasure = {
     },
     messages: {
       broadObject:
-        "Avoid broad object types that erase known properties. Preserve a concrete object shape instead.",
+        "This broad object type discards known property evidence. Use the expected owner type, or parse external input into a concrete domain type at its boundary.",
       broadRecord:
-        "Avoid records with broad string keys and any/unknown values. Preserve a concrete object shape instead.",
+        "This open record discards both key and value evidence. Use a concrete projection, a named dictionary value type, or parse external input at its boundary.",
       isRecord:
-        "Avoid isRecord(). Write a domain-specific type guard that narrows to a concrete object shape.",
+        "isRecord() proves only a broad container shape. Replace it with a domain-specific guard such as `isUser(value)`, or parse the value with its boundary schema.",
     },
     schema: [],
   },
