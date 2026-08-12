@@ -23,6 +23,7 @@ import {
   calleeName,
   createZodImportState,
   enclosingRefinementCall,
+  isIdentifierMember,
   isFunctionNode,
   isInsideTryBlock,
   memberName,
@@ -36,14 +37,7 @@ const throwingGlobalCalls = new Set(["BigInt", "decodeURIComponent"]);
 const throwingNewExpressions = new Set(["RegExp", "URL"]);
 
 function isJsonParse(node: AstNode): boolean {
-  const callee = unwrapExpression(node.callee);
-  const object = unwrapExpression(callee?.object);
-  return (
-    callee?.type === "MemberExpression" &&
-    object?.type === "Identifier" &&
-    object.name === "JSON" &&
-    memberName(callee) === "parse"
-  );
+  return isIdentifierMember(node.callee, "JSON", "parse");
 }
 
 function objectHasTrueProperty(node: AstNode | null | undefined, name: string): boolean {
@@ -70,14 +64,8 @@ function hasFatalIssue(node: AstNode | null | undefined): boolean {
 
 function hasUrlCanParseGuard(node: AstNode | null | undefined): boolean {
   return astSubtreeSome(node, (candidate) => {
-    const callee = unwrapExpression(candidate.callee);
-    const object = unwrapExpression(callee?.object);
     return (
-      candidate.type === "CallExpression" &&
-      callee?.type === "MemberExpression" &&
-      object?.type === "Identifier" &&
-      object.name === "URL" &&
-      memberName(callee) === "canParse"
+      candidate.type === "CallExpression" && isIdentifierMember(candidate.callee, "URL", "canParse")
     );
   });
 }

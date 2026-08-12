@@ -4,6 +4,7 @@
  * The graph uses Oxlint ESTree nodes and visitor keys. This design lets all rules share one
  * analysis without a second parser or changes to the source AST.
  */
+import { isAstNode } from "../rules/ast-nodes.ts";
 import type { AstNode, VisitorKeys } from "../rules/types.ts";
 
 export type ControlFlowEdgeKind = "abrupt" | "branch" | "continue" | "fallthrough" | "normal";
@@ -78,15 +79,6 @@ const functionTypes = new Set([
   "FunctionExpression",
 ]);
 
-function isNode(value: unknown): value is AstNode {
-  return (
-    value !== null &&
-    Object(value) === value &&
-    !Array.isArray(value) &&
-    Reflect.has(Object(value), "type")
-  );
-}
-
 function forEachChild(
   node: AstNode,
   visitorKeys: VisitorKeys,
@@ -96,11 +88,11 @@ function forEachChild(
     const value = Reflect.get(node, key);
     if (Array.isArray(value)) {
       for (const item of value) {
-        if (isNode(item)) {
+        if (isAstNode(item)) {
           visit(item);
         }
       }
-    } else if (isNode(value)) {
+    } else if (isAstNode(value)) {
       visit(value);
     }
   }
@@ -235,7 +227,7 @@ function buildLoop(
   connect(loop, bodyEntry, "branch");
   connect(loop, after, "branch");
   const body = statement.body;
-  const bodyExits = isNode(body)
+  const bodyExits = isAstNode(body)
     ? buildStatement(builder, body, [bodyEntry], {
         breakTarget: after,
         continueTarget: loop,
@@ -290,15 +282,15 @@ function buildTry(
   context: BuildContext,
 ): BasicBlock[] {
   const anchor = appendNode(builder, incoming, statement);
-  const tryExits = isNode(statement.block)
+  const tryExits = isAstNode(statement.block)
     ? buildStatement(builder, statement.block, [anchor], context)
     : [anchor];
-  const handlerBody = isNode(statement.handler) ? statement.handler.body : null;
-  const handlerExits = isNode(handlerBody)
+  const handlerBody = isAstNode(statement.handler) ? statement.handler.body : null;
+  const handlerExits = isAstNode(handlerBody)
     ? buildStatement(builder, handlerBody, [anchor], context)
     : [];
   const combined = [...tryExits, ...handlerExits];
-  if (isNode(statement.finalizer)) {
+  if (isAstNode(statement.finalizer)) {
     return buildStatement(builder, statement.finalizer, combined, context);
   }
   return combined;
@@ -332,10 +324,10 @@ function buildStatement(
     case "IfStatement": {
       const testExits = buildExpression(builder, statement.test as AstNode, incoming);
       const branch = appendNode(builder, testExits, statement);
-      const consequent = isNode(statement.consequent)
+      const consequent = isAstNode(statement.consequent)
         ? buildStatement(builder, statement.consequent, [branch], context)
         : [branch];
-      const alternate = isNode(statement.alternate)
+      const alternate = isAstNode(statement.alternate)
         ? buildStatement(builder, statement.alternate, [branch], context)
         : [branch];
       const join = createBlock(builder);
@@ -376,7 +368,7 @@ function buildStatement(
       return [];
     }
     case "LabeledStatement":
-      return isNode(statement.body)
+      return isAstNode(statement.body)
         ? buildStatement(builder, statement.body, incoming, context)
         : incoming;
     default:
@@ -529,7 +521,7 @@ function buildAnalysis(program: AstNode, visitorKeys: VisitorKeys): ControlFlowA
 
   const visit = (node: AstNode, owner: AstNode): void => {
     owners.set(node, owner);
-    if (node !== owner && functionTypes.has(node.type) && isNode(node.body)) {
+    if (node !== owner && functionTypes.has(node.type) && isAstNode(node.body)) {
       register(node, node.body);
       owners.set(node, node);
       forEachChild(node.body, visitorKeys, (child) => visit(child, node));

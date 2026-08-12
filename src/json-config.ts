@@ -54,7 +54,7 @@ export function parseJsonc<T>(text: string, filename: string): T {
       `${filename} is invalid: ${printParseErrorCode(firstError.error)} at offset ${firstError.offset}`,
     );
   }
-  if (value === null || Object(value) !== value || Array.isArray(value)) {
+  if (value === null || value === undefined || Object.getPrototypeOf(value) !== Object.prototype) {
     throw new Error(`${filename} must contain a JSON object`);
   }
   return value as T;
@@ -89,28 +89,29 @@ function appendStrings(
   return next;
 }
 
+function isJsPlugin(value: string | JsPlugin): value is JsPlugin {
+  return Reflect.has(Object(value), "name") || Reflect.has(Object(value), "specifier");
+}
+
 function hasJsPlugin(plugins: Array<string | JsPlugin>, required: string | JsPlugin): boolean {
   return plugins.some((plugin) => {
-    if (Object(required) !== required) {
-      const specifier = required as string;
+    if (!isJsPlugin(required)) {
+      const specifier = required;
       if (plugin === specifier) {
         return true;
       }
-      if (plugin === null || Object(plugin) !== plugin) {
+      if (!isJsPlugin(plugin)) {
         return false;
       }
-      const entry = plugin as JsPlugin;
       return (
-        entry.specifier === specifier && (entry.name === undefined || entry.name === specifier)
+        plugin.specifier === specifier && (plugin.name === undefined || plugin.name === specifier)
       );
     }
 
-    if (plugin === null || Object(plugin) !== plugin) {
+    if (!isJsPlugin(plugin)) {
       return false;
     }
-    const entry = plugin as JsPlugin;
-    const requiredEntry = required as JsPlugin;
-    return entry.name === requiredEntry.name && entry.specifier === requiredEntry.specifier;
+    return plugin.name === required.name && plugin.specifier === required.specifier;
   });
 }
 
@@ -179,7 +180,9 @@ function enableOxfmtOption(
 ): string {
   if (
     current === true ||
-    (current !== null && Object(current) === current && !Array.isArray(current))
+    (current !== null &&
+      current !== undefined &&
+      Object.getPrototypeOf(current) === Object.prototype)
   ) {
     return text;
   }

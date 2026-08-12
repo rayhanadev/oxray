@@ -23,10 +23,10 @@ function typeParameterName(node: AstNode | null | undefined): string | undefined
   if (name === undefined) {
     return undefined;
   }
-  if (Object(name) !== name) {
-    return String(name);
+  if (isAstNode(name)) {
+    return name.type === "Identifier" ? String(name.name) : undefined;
   }
-  return isAstNode(name) && name.type === "Identifier" ? String(name.name) : undefined;
+  return String(name);
 }
 
 const zodtypeTGenericHelper = {

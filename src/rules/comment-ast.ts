@@ -5,6 +5,7 @@
  * the same declaration.
  */
 import { directlyPrecedingComment, type CommentSourceCode } from "../analysis/comments.ts";
+import { isAstNode } from "./ast-nodes.ts";
 import type { AstNode, SourceComment } from "./types.ts";
 
 export interface DocumentationTarget {
@@ -34,7 +35,7 @@ function unwrapDocumentationExpression(node: AstNode | null | undefined): AstNod
   let current = node ?? undefined;
   while (current && transparentExpressionTypes.has(current.type)) {
     const expression = current.expression;
-    current = Object(expression) === expression ? (expression as AstNode) : undefined;
+    current = isAstNode(expression) ? expression : undefined;
   }
   return current;
 }
@@ -183,7 +184,7 @@ export function documentationHost(sourceCode: CommentSourceCode, node: AstNode):
       return reversed.slice(index + 1).find((item) => item.type === "VariableDeclaration") ?? node;
     }
     if (ancestor.type === "Property" || ancestor.type === "PropertyDefinition") {
-      const value = Object(ancestor.value) === ancestor.value ? (ancestor.value as AstNode) : null;
+      const value = isAstNode(ancestor.value) ? ancestor.value : null;
       return unwrapDocumentationExpression(value) === node ? ancestor : null;
     }
     if (ancestor.type === "MethodDefinition") {

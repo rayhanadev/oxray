@@ -4,6 +4,7 @@
  * The helpers track actual Zod 4 imports. They also unwrap transparent TypeScript expressions so
  * rules do not mistake unrelated builders for Zod schemas.
  */
+import { isAstNode } from "./ast-nodes.ts";
 import type { AstNode } from "./types.ts";
 
 export interface ZodImportState {
@@ -76,7 +77,7 @@ export function unwrapExpression(node: AstNode | null | undefined): AstNode | un
   let current = node ?? undefined;
   while (current && transparentExpressionTypes.has(current.type)) {
     const expression = current.expression;
-    current = Object(expression) === expression ? (expression as AstNode) : undefined;
+    current = isAstNode(expression) ? expression : undefined;
   }
   return current;
 }
@@ -132,7 +133,7 @@ export function astSubtreeSome(
       ...(candidate.properties ?? []),
       ...(candidate.specifiers ?? []),
     ];
-    return children.some((child) => Object(child) === child && visit(child as AstNode));
+    return children.some((child) => isAstNode(child) && visit(child));
   }
 
   return visit(node);
@@ -154,6 +155,22 @@ export function propertyName(node: AstNode | null | undefined): string | undefin
 export function memberName(node: AstNode | null | undefined): string | undefined {
   const current = unwrapExpression(node);
   return current?.type === "MemberExpression" ? propertyName(current.property) : undefined;
+}
+
+/** Matches a member on one named identifier after removing transparent expression wrappers. */
+export function isIdentifierMember(
+  node: AstNode | null | undefined,
+  identifier: string,
+  member: string,
+): boolean {
+  const current = unwrapExpression(node);
+  const object = unwrapExpression(current?.object);
+  return (
+    current?.type === "MemberExpression" &&
+    object?.type === "Identifier" &&
+    object.name === identifier &&
+    memberName(current) === member
+  );
 }
 
 /** Returns the stable name for direct and member call targets. */

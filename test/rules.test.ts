@@ -79,6 +79,7 @@ type RoleMap = Record<"admin" | "member", User>;
 interface User { id: string }
 function isUser(value: unknown): value is User { return Boolean(value); }
 isUser(value);
+Reflect.has(Object(value), "id");
 `);
 
     expect(result.exitCode).toBe(0);
@@ -94,6 +95,10 @@ isUser(value);
     ["guards.isRecord(value);", "member isRecord call"],
     ['guards["isRecord"](value);', "computed isRecord call"],
     ["guards.isRecord?.(value);", "optional isRecord call"],
+    ["Object(value) === value;", "Object identity check"],
+    ["value === Object(value);", "reversed Object identity check"],
+    ["Object(value) !== value;", "negative Object identity check"],
+    ["record.value != Object(record.value);", "member Object identity check"],
   ] as const;
 
   for (const [code, name] of invalidCases) {
@@ -358,6 +363,11 @@ const annotated: z.ZodType<User> = z.object({ id: z.string() });
 function parseWith<T>(schema: z.ZodType<T>): T { return schema.parse(value); }
 schema.safeParse(JSON.parse(text));
 schema.safeParse(JSON.parse("{"));
+z.unknown();
+z.codec(z.string(), z.json(), {
+  decode: (text) => JSON.parse(text),
+  encode: (value) => JSON.stringify(value),
+});
 z.string().url().refine((value) => new URL(value).hostname.length > 0);
 z.strictObject({ a: z.string(), b: z.string() }).superRefine((value, ctx) => {
   if (value.a === value.b) {
@@ -399,6 +409,13 @@ type Parsed = z.output<typeof schema>;
 const checked = z.object({ id: z.string() }) satisfies z.ZodType<User>;
 function parseWith<S extends z.ZodType>(schema: S): z.output<S> { return schema.parse(value); }
 try { schema.safeParse(JSON.parse(text)); } catch {}
+z.json();
+z.strictObject({ id: z.string() });
+z.custom<User>(isUser);
+z.codec(z.iso.datetime(), z.date(), {
+  decode: (text) => new Date(text),
+  encode: (value) => value.toISOString(),
+});
 z.string().refine((value) => {
   try { return new URL(value).hostname.length > 0; } catch { return false; }
 });
@@ -421,7 +438,7 @@ z.string().trim().min(1);
 z.record(z.string(), z.string());
 const providerResponse = z.object({
   count: z.number(),
-  providerMetadata: z.record(z.string(), z.unknown()),
+  providerMetadata: z.record(z.string(), z.json()),
 });
 defineTool({
   input: z.strictObject({
@@ -485,10 +502,24 @@ import { z as z3 } from "zod/v3";
 z3.string().url();
 z3.number().int();
 z3.union([z3.literal(1), z3.literal(2)]);
+z3.unknown();
+z3.any();
+z3.object({});
+z3.codec(z3.string(), z3.unknown(), {
+  decode: JSON.parse,
+  encode: JSON.stringify,
+});
 
 const z = makeUnrelatedBuilder();
 z.string().url();
 z.number().int();
+z.unknown();
+z.any();
+z.object({});
+z.codec(z.string(), z.unknown(), {
+  decode: JSON.parse,
+  encode: JSON.stringify,
+});
 `);
 
     expect(result.exitCode).toBe(0);
@@ -508,7 +539,7 @@ const getterSchema: z.ZodType<Node> = z.object({
     return z.array(getterSchema);
   },
 });
-export const publicSchema: z.ZodType<Node> = z.object({ children: z.array(z.unknown()) });
+export const publicSchema: z.ZodType<Node> = z.object({ children: z.array(z.json()) });
 
 function codec<Output, Input>(schema: z.ZodType<Output, Input>) {
   return schema;
@@ -517,7 +548,7 @@ function factory<Output>(options: { schema: z.ZodType<Output> }) {
   return options.schema;
 }
 
-const providerMetadata = z.record(z.string(), z.unknown());
+const providerMetadata = z.record(z.string(), z.json());
 schema.safeParse(JSON.parse('{"__proto__":123}'));
 z.string().min(2).trim();
 z.strictObject({ a: z.string(), b: z.string(), c: z.string() }).superRefine((value, ctx) => {
@@ -529,6 +560,122 @@ z.strictObject({ a: z.string(), b: z.string(), c: z.string() }).superRefine((val
 
     expect(result.exitCode).toBe(0);
     expect(result.output).not.toContain("rayhanadev(");
+  });
+
+  const erasedZodSchemaCases = [
+    ["schema.unknown();", "unknown schema"],
+    ['schema["any"]();', "any schema"],
+    ["schema.object({});", "empty object schema"],
+    ["schema.looseObject({});", "empty loose object schema"],
+    ["schema.custom<User>();", "custom schema without a predicate"],
+    ["schema.custom<User>(undefined);", "custom schema with an undefined predicate"],
+  ] as const;
+
+  for (const [code, name] of erasedZodSchemaCases) {
+    test(`rejects ${name}`, async () => {
+      const result = await lint(`
+import { z as schema } from "zod/v4";
+type User = { id: string };
+${code}
+`);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toContain("rayhanadev(no-zod-type-erasure)");
+    });
+  }
+
+  test("accepts schemas that preserve concrete runtime information", async () => {
+    const result = await lint(`
+import { z } from "zod/v4";
+type User = { id: string };
+
+z.json();
+z.record(z.string(), z.json());
+z.object({ id: z.string() });
+z.strictObject({});
+z.strictObject({ id: z.string() });
+z.looseObject({ id: z.string() });
+z.custom<User>(isUser);
+`);
+
+    expect(result.output).not.toContain("rayhanadev(no-zod-type-erasure)");
+  });
+
+  test("keeps the specialized tool record diagnostic", async () => {
+    const result = await lint(`
+import { z } from "zod/v4";
+defineTool({
+  input: z.strictObject({
+    metadata: z.record(z.string(), z.unknown()),
+  }),
+});
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(record-string-unknown)");
+    expect(result.output).not.toContain("rayhanadev(no-zod-type-erasure)");
+  });
+
+  const invalidJsonCodecCases = [
+    [
+      `
+function jsonCodec<S extends schema.ZodType>(valueSchema: S) {
+  return schema.codec(schema.string(), valueSchema, {
+    decode(text, payload) {
+      try {
+        return JSON["parse"](text);
+      } catch (cause) {
+        payload.issues.push({
+          code: "invalid_format",
+          format: "json",
+          input: text,
+          message: cause instanceof Error ? cause.message : "invalid JSON",
+        });
+        return schema.NEVER;
+      }
+    },
+    encode: JSON.stringify,
+  });
+}
+`,
+      "guarded parsing and a direct stringify reference",
+    ],
+    [
+      `
+schema["codec"](schema.json(), schema.string(), {
+  decode: JSON.stringify,
+  encode: JSON.parse,
+});
+`,
+      "the inverted JSON operation pair",
+    ],
+  ] as const;
+
+  for (const [code, name] of invalidJsonCodecCases) {
+    test(`rejects a JSON codec with ${name}`, async () => {
+      const result = await lint(`
+import { z as schema } from "zod/v4";
+${code}
+`);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toContain("rayhanadev(no-json-parse-stringify-codec)");
+    });
+  }
+
+  test("accepts domain codecs and unrelated JSON operations", async () => {
+    const result = await lint(`
+import { z } from "zod/v4";
+
+z.codec(z.iso.datetime(), z.date(), {
+  decode: (text) => new Date(text),
+  encode: (value) => value.toISOString(),
+});
+const parsed = JSON.parse(text);
+const serialized = JSON.stringify(parsed);
+`);
+
+    expect(result.output).not.toContain("rayhanadev(no-json-parse-stringify-codec)");
   });
 
   test("preserves CUID and versioned UUID formats in suggestions", async () => {

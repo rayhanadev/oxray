@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+import { isAstNode } from "../rules/ast-nodes.ts";
 import type { AstNode, SourceComment, VisitorKeys } from "../rules/types.ts";
 
 export interface CommentSourceCode {
@@ -356,12 +357,12 @@ export function walkAst(
     const value = Reflect.get(node, key);
     if (Array.isArray(value)) {
       for (const child of value) {
-        if (child !== null && Object(child) === child && Reflect.has(Object(child), "type")) {
-          walkAst(child as AstNode, visitorKeys, visit);
+        if (isAstNode(child)) {
+          walkAst(child, visitorKeys, visit);
         }
       }
-    } else if (value !== null && Object(value) === value && Reflect.has(Object(value), "type")) {
-      walkAst(value as AstNode, visitorKeys, visit);
+    } else if (isAstNode(value)) {
+      walkAst(value, visitorKeys, visit);
     }
   }
 }
