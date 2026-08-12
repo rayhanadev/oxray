@@ -8,6 +8,7 @@
  * that merely returns `z.ZodType<T>` without accepting one as a parameter. It also leaves an
  * explicit `z.ZodType<Output, Input>` alone because that helper preserves both directions.
  */
+import { astNodes, isAstNode } from "./ast-nodes.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   createZodImportState,
@@ -25,8 +26,7 @@ function typeParameterName(node: AstNode | null | undefined): string | undefined
   if (Object(name) !== name) {
     return String(name);
   }
-  const nameNode = name as unknown as AstNode;
-  return nameNode.type === "Identifier" ? String(nameNode.name) : undefined;
+  return isAstNode(name) && name.type === "Identifier" ? String(name.name) : undefined;
 }
 
 const zodtypeTGenericHelper = {
@@ -70,7 +70,7 @@ const zodtypeTGenericHelper = {
           return;
         }
 
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         const functionIndex = ancestors.findLastIndex(isFunctionNode);
         const fn = ancestors[functionIndex];
         if (!fn) {

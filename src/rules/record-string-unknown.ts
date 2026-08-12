@@ -7,6 +7,7 @@
  * Does not flag: provider metadata and other open records outside a tool input,
  * `z.record(z.string(), userSchema)`, or `z.record(z.string(), z.json())`.
  */
+import { astNodes } from "./ast-nodes.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   createZodImportState,
@@ -33,7 +34,7 @@ const recordStringUnknown = {
       ...zodImportVisitor(zod),
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         if (
           isInsideToolInput(ancestors) &&
           isDirectZodCall(node, "record", zod.roots) &&

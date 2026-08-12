@@ -16,7 +16,7 @@ const supportedPackageManagers = ["bun", "npm", "pnpm", "yarn"] as const;
 
 type PresetSelection = "recommended" | "extensive" | "custom";
 
-const presetDescriptions: { [preset in IndividualOxclippyPresetName]: string } = {
+const presetDescriptions = {
   style: "Style simplifications",
   complexity: "Unnecessary complexity",
   correctness: "Likely bugs",
@@ -24,7 +24,7 @@ const presetDescriptions: { [preset in IndividualOxclippyPresetName]: string } =
   functions: "Function size and complexity",
   principles: "Standard library and combinator preferences",
   pedantic: "Opinionated naming and readability checks",
-};
+} satisfies Record<IndividualOxclippyPresetName, string>;
 
 function finishPrompt<T>(value: T | symbol): T {
   if (isCancel(value)) {

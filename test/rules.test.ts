@@ -43,10 +43,11 @@ afterAll(async () => {
 
 async function lint(
   code: string,
-  flags: readonly string[] = [],
+  options: { filename?: string; flags?: readonly string[] } = {},
 ): Promise<{ code: string; exitCode: number; output: string }> {
   fixtureNumber += 1;
-  const fixturePath = join(fixtureDirectory, `fixture-${fixtureNumber}.ts`);
+  const { filename, flags = [] } = options;
+  const fixturePath = join(fixtureDirectory, filename ?? `fixture-${fixtureNumber}.ts`);
   await Bun.write(fixturePath, code);
   const child = Bun.spawn(
     [
@@ -76,7 +77,6 @@ describe("no-type-erasure", () => {
 type UserMap = Record<string, User>;
 type RoleMap = Record<"admin" | "member", User>;
 interface User { id: string }
-type MaybeUser = unknown;
 function isUser(value: unknown): value is User { return Boolean(value); }
 isUser(value);
 `);
@@ -86,10 +86,6 @@ isUser(value);
   });
 
   const invalidCases = [
-    ["type Data = Record<string, unknown>;", "broad string keys"],
-    ["type Data = Record<string, any>;", "broad string keys"],
-    ["type Data = { [key: string]: unknown };", "broad string keys"],
-    ["interface Data { [key: string]: any }", "broad string keys"],
     ["type Data = object;", "broad object type"],
     ["type Data = Object;", "Object type"],
     ["type Data = {};", "empty object type"],
@@ -106,6 +102,37 @@ isUser(value);
 
       expect(result.exitCode).toBe(1);
       expect(result.output).toContain("rayhanadev(no-type-erasure)");
+    });
+  }
+});
+
+describe("no-unsafe-dictionary-type", () => {
+  test("accepts concrete dictionary values", async () => {
+    const result = await lint(`
+interface User { id: string }
+type Users = Record<string, User>;
+type Indexed = { [key: string]: User };
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(no-unsafe-dictionary-type)");
+  });
+
+  const invalidCases = [
+    "type Data = Record<string, unknown>;",
+    "type Data = Record<string, any>;",
+    "type Data = { [key: string]: unknown };",
+    "interface Data { [key: string]: any }",
+    "type Value = unknown;\ntype Data = Record<string, Value>;",
+    "interface Empty {}\ntype Data = Readonly<Record<string, Empty>>;",
+  ];
+
+  for (const code of invalidCases) {
+    test(`reports ${code}`, async () => {
+      const result = await lint(code);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toContain("rayhanadev(no-unsafe-dictionary-type)");
     });
   }
 });
@@ -134,6 +161,160 @@ describe("no-typeof", () => {
   }
 });
 
+describe("selected anti-slop rules", () => {
+  test("allows one assertion that preserves a direct review point", async () => {
+    const result = await lint(`
+const user = input as User;
+const values = [1, 2] as const;
+`);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(no-chained-type-assertions)");
+  });
+
+  test("reports chained as and angle-bracket assertions", async () => {
+    const result = await lint(`
+const first = input as unknown as User;
+const second = (<unknown>input) as User;
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-chained-type-assertions)");
+  });
+
+  test("reports conditional empty-object spreads", async () => {
+    const result = await lint(`
+const options = {
+  ...(enabled ? { enabled } : {}),
+};
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-conditional-empty-object-spread)");
+  });
+
+  test("reports known values widened through explicit broad targets", async () => {
+    const invalid = await lint(`
+const handlers: Record<string, Handler> = {
+  start: startHandler,
+};
+`);
+    const valid = await lint(`
+const handlers = {
+  start: startHandler,
+} satisfies Record<string, Handler>;
+`);
+
+    expect(invalid.exitCode).toBe(1);
+    expect(invalid.output).toContain("rayhanadev(no-known-value-widening)");
+    expect(valid.output).not.toContain("rayhanadev(no-known-value-widening)");
+  });
+
+  test("reports aliases that only conceal unknown", async () => {
+    const result = await lint(`
+type ExternalValue = unknown;
+type RenamedValue = ExternalValue;
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-unknown-type-aliases)");
+  });
+
+  test("reports local values widened and asserted back", async () => {
+    const result = await lint(`
+const loaded: User = loadUser();
+const stored: unknown = loaded;
+const user = stored as User;
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-widen-then-assert)");
+  });
+});
+
+describe("file and export organization", () => {
+  test("accepts focused dedicated files", async () => {
+    const cases = [
+      [
+        "types.ts",
+        "export interface User { id: string }\nexport type UserId = string;",
+        "types-file-organization",
+      ],
+      ["enums.ts", 'export enum Role { Admin = "admin" }', "enum-file-organization"],
+      ["constants.ts", "export const RETRY_LIMIT = 3;", "constants-file-organization"],
+      [
+        "errors.ts",
+        "/** Preserves the response status because callers render it. */\nexport class RequestError extends Error {}",
+        "errors-file-organization",
+      ],
+      [
+        "schemas.ts",
+        'import { z } from "zod/v4";\nexport const userSchema = z.strictObject({ id: z.string() });\nexport type User = z.infer<typeof userSchema>;',
+        "schemas-file-organization",
+      ],
+    ] as const;
+
+    for (const [filename, code, ruleName] of cases) {
+      const result = await lint(code, { filename });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output).not.toContain(`rayhanadev(${ruleName})`);
+    }
+  });
+
+  test("reports declarations that conflict with dedicated filenames", async () => {
+    const cases = [
+      ["types.ts", 'import "./setup.ts";\nexport const value = 1;', "types-file-organization"],
+      ["enums.ts", 'export const role = "admin";', "enum-file-organization"],
+      ["constants.ts", "export type RetryLimit = number;", "constants-file-organization"],
+      ["errors.ts", "export interface ClientError {}", "errors-file-organization"],
+      ["schemas.ts", "export type User = { id: string };", "schemas-file-organization"],
+    ] as const;
+
+    for (const [filename, code, ruleName] of cases) {
+      const result = await lint(code, { filename });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toContain(`rayhanadev(${ruleName})`);
+    }
+  });
+
+  test("matches separator-insensitive filenames to named default exports", async () => {
+    const valid = await lint("const UserClient = {};\nexport default UserClient;", {
+      filename: "user-client.ts",
+    });
+    const invalid = await lint("const UserClient = {};\nexport default UserClient;", {
+      filename: "client.ts",
+    });
+
+    expect(valid.exitCode).toBe(0);
+    expect(valid.output).not.toContain("rayhanadev(filename-match-export)");
+    expect(invalid.exitCode).toBe(1);
+    expect(invalid.output).toContain("rayhanadev(filename-match-export)");
+    expect(invalid.output).toContain("user-client.ts");
+  });
+
+  test("requires declarations for direct, indirect, and default function exports", async () => {
+    const valid = await lint(`
+/** Loads a user because the command needs current account data. */
+export function loadUser() {}
+`);
+    const invalid = await lint(`
+/** Loads a user because the command needs current account data. */
+export const loadUser = () => {};
+/** Saves a user because the command changed account data. */
+const saveUser = function () {};
+export { saveUser };
+export default (() => {});
+`);
+
+    expect(valid.exitCode).toBe(0);
+    expect(valid.output).not.toContain("rayhanadev(no-exported-function-expressions)");
+    expect(invalid.exitCode).toBe(1);
+    expect(invalid.output).toContain("rayhanadev(no-exported-function-expressions)");
+  });
+});
+
 describe("Zod 4 rules", () => {
   const nonZodRuleNames = new Set([
     "comment-explains-why",
@@ -141,11 +322,24 @@ describe("Zod 4 rules", () => {
     "comment-ste100-heuristics",
     "commented-out-code-requires-reason",
     "complex-file-header",
+    "constants-file-organization",
     "domain-knowledge-in-agents",
+    "enum-file-organization",
+    "errors-file-organization",
+    "filename-match-export",
     "lint-suppression-requires-reason",
+    "no-chained-type-assertions",
+    "no-conditional-empty-object-spread",
+    "no-exported-function-expressions",
+    "no-known-value-widening",
     "no-type-erasure",
     "no-typeof",
+    "no-unknown-type-aliases",
+    "no-unsafe-dictionary-type",
+    "no-widen-then-assert",
     "require-jsdoc-comments",
+    "schemas-file-organization",
+    "types-file-organization",
   ]);
   const zodRuleNames = personalRuleNames.filter((ruleName) => !nonZodRuleNames.has(ruleName));
 
@@ -368,7 +562,7 @@ type Parsed = schema.infer<typeof userSchema>;
 schema.string().uuidv4();
 const userSchema: schema.ZodType<User> = schema.object({ id: schema.string() });
 `,
-      ["--fix"],
+      { flags: ["--fix"] },
     );
 
     expect(result.exitCode).toBe(0);
@@ -399,12 +593,12 @@ z.strictObject({ name: z.string() }).superRefine((value, ctx) => {
 });
 z.string().refine((value) => new URL(value).hostname.length > 0);
 `;
-    const safeResult = await lint(source, ["--fix"]);
+    const safeResult = await lint(source, { flags: ["--fix"] });
 
     expect(safeResult.exitCode).toBe(1);
     expect(safeResult.code).toBe(source);
 
-    const suggestedResult = await lint(source, ["--fix-suggestions"]);
+    const suggestedResult = await lint(source, { flags: ["--fix-suggestions"] });
 
     expect(suggestedResult.exitCode).toBe(0);
     expect(suggestedResult.code).toContain("input: z.strictObject({");

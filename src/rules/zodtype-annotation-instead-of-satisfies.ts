@@ -8,6 +8,7 @@
  * Does not flag: a schema that uses `satisfies` or a recursive declaration that needs an annotation.
  * It also permits an exported opaque schema or a mutable `let` declaration.
  */
+import { astNodes } from "./ast-nodes.ts";
 import {
   correctionFromEdits,
   removeRange,
@@ -63,7 +64,7 @@ const zodtypeAnnotationInsteadOfSatisfies = {
           return;
         }
 
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         if (ancestors.some((ancestor) => ancestor.type.startsWith("Export"))) {
           return;
         }

@@ -10,6 +10,11 @@ export interface ZodImportState {
   readonly roots: Set<string>;
 }
 
+/** Defines the import-discovery visitor shared by Zod rules. */
+export interface ZodImportVisitor {
+  Program: (node: unknown) => void;
+}
+
 const transparentExpressionTypes = new Set([
   "ChainExpression",
   "ParenthesizedExpression",
@@ -58,9 +63,7 @@ export function collectZodImports(program: AstNode, state: ZodImportState): void
 }
 
 /** Provides a Program visitor so rules can compose import discovery with other visitors. */
-export function zodImportVisitor(state: ZodImportState): {
-  Program: (node: unknown) => void;
-} {
+export function zodImportVisitor(state: ZodImportState): ZodImportVisitor {
   return {
     Program(node) {
       collectZodImports(node as AstNode, state);

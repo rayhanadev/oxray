@@ -53,6 +53,7 @@ export interface AstNode {
   source?: AstNode;
   specifiers?: AstNode[];
   start?: number;
+  superClass?: AstNode | null;
   end?: number;
   test?: AstNode;
   typeName?: AstNode;
