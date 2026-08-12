@@ -1,5 +1,11 @@
 # @rayhanadev/ox
 
+## 0.3.0
+
+### Minor Changes
+
+- [#6](https://github.com/rayhanadev/oxray/pull/6) [`bfae467`](https://github.com/rayhanadev/oxray/commit/bfae467851fe0dd3556ecaf8c43e3b4532951cba) Thanks [@rayhanadev](https://github.com/rayhanadev)! - Add opinionated comment, JSDoc, ASD-STE100, file-overview, and AGENTS.md guidance rules.
+
 ## 0.2.0
 
 ### Minor Changes
