@@ -10,6 +10,7 @@
  * also permits a guarded `z.stringFormat()` predicate. A `try` around schema construction does not
  * protect the callback.
  */
+import { astNodes } from "./ast-nodes.ts";
 import {
   correctionFromEdits,
   replaceNode,
@@ -182,7 +183,7 @@ const throwingZodRefine = {
           zod.roots.size > 0 &&
           (throwingGlobalCalls.has(calleeName(node.callee) ?? "") || isJsonParse(node))
         ) {
-          const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+          const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
           if (isUnprotectedRefinement(ancestors)) {
             report(rawNode, ancestors);
           }
@@ -191,7 +192,7 @@ const throwingZodRefine = {
       NewExpression(rawNode) {
         const node = rawNode as AstNode;
         if (zod.roots.size > 0 && throwingNewExpressions.has(calleeName(node.callee) ?? "")) {
-          const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+          const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
           if (isUnprotectedRefinement(ancestors, calleeName(node.callee) === "URL")) {
             report(rawNode, ancestors);
           }

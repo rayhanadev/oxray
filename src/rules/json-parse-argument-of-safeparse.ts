@@ -8,6 +8,7 @@
  * Does not flag: the same call inside a `try` block, a compile-time string literal confirmed to be
  * valid JSON, or `jsonCodec(schema).safeParse(text)`.
  */
+import { astNodes } from "./ast-nodes.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   createZodImportState,
@@ -73,7 +74,7 @@ const jsonParseArgumentOfSafeparse = {
           return;
         }
 
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         if (!isInsideTryBlock(ancestors)) {
           context.report({ node: rawNode, messageId: "codec" });
         }

@@ -4,36 +4,11 @@
  * Detects broad TypeScript object types and generic `isRecord` calls. These forms erase known
  * properties and force later code to recover information with casts or repeated checks.
  *
- * Flags: `type Data = Record<string, unknown>;` and `isRecord(value);`
+ * Flags: `type Data = object;` and `isRecord(value);`
  *
- * Does not flag: `type Users = Record<string, User>;` or `isUser(value);`
+ * Does not flag: `type Data = { id: string };` or `isUser(value);`
  */
 import type { AstNode, OxlintRule } from "./types.ts";
-
-function isBroadValueType(node: AstNode | undefined): boolean {
-  return node?.type === "TSAnyKeyword" || node?.type === "TSUnknownKeyword";
-}
-
-function unwrapTypeAnnotation(node: AstNode | undefined): AstNode | undefined {
-  return node?.type === "TSTypeAnnotation" ? node.typeAnnotation : node;
-}
-
-function isBroadRecord(node: AstNode): boolean {
-  if (node.typeName?.type !== "Identifier" || node.typeName.name !== "Record") {
-    return false;
-  }
-
-  const typeArguments = node.typeArguments ?? node.typeParameters;
-  const [keyType, valueType] = typeArguments?.params ?? [];
-  return keyType?.type === "TSStringKeyword" && isBroadValueType(valueType);
-}
-
-function isBroadStringIndex(node: AstNode): boolean {
-  const [parameter] = node.parameters ?? node.params ?? [];
-  const keyType = unwrapTypeAnnotation(parameter?.typeAnnotation);
-  const valueType = unwrapTypeAnnotation(node.typeAnnotation);
-  return keyType?.type === "TSStringKeyword" && isBroadValueType(valueType);
-}
 
 function calleeName(node: AstNode | undefined): string | undefined {
   if (node?.type === "ChainExpression") {
@@ -63,13 +38,11 @@ const noTypeErasure = {
   meta: {
     type: "problem",
     docs: {
-      description: "Disallow broad object types and generic record guards that erase known shapes",
+      description: "Disallow broad object types and generic record guards",
     },
     messages: {
       broadObject:
         "This broad object type discards known property evidence. Use the expected owner type, or parse external input into a concrete domain type at its boundary.",
-      broadRecord:
-        "This open record discards both key and value evidence. Use a concrete projection, a named dictionary value type, or parse external input at its boundary.",
       isRecord:
         "isRecord() proves only a broad container shape. Replace it with a domain-specific guard such as `isUser(value)`, or parse the value with its boundary schema.",
     },
@@ -79,15 +52,8 @@ const noTypeErasure = {
     return {
       TSTypeReference(rawNode) {
         const node = rawNode as AstNode;
-        if (isBroadRecord(node)) {
-          context.report({ node: rawNode, messageId: "broadRecord" });
-        } else if (node.typeName?.type === "Identifier" && node.typeName.name === "Object") {
+        if (node.typeName?.type === "Identifier" && node.typeName.name === "Object") {
           context.report({ node: rawNode, messageId: "broadObject" });
-        }
-      },
-      TSIndexSignature(rawNode) {
-        if (isBroadStringIndex(rawNode as AstNode)) {
-          context.report({ node: rawNode, messageId: "broadRecord" });
         }
       },
       TSObjectKeyword(node) {

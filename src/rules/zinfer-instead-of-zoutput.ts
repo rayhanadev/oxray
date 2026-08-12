@@ -4,8 +4,10 @@
  *
  * Flags: `type User = z.infer<typeof userSchema>;`
  *
- * Does not flag: `type User = z.output<typeof userSchema>;` or `z.input<typeof userSchema>`.
+ * Does not flag: `type User = z.output<typeof userSchema>;`, `z.input`, or aliases in `schemas.ts`.
  */
+import { basename } from "node:path";
+
 import { correctionFromEdits, replaceNode } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import { createZodImportState, qualifiedTypeName, zodImportVisitor } from "./zod-ast.ts";
@@ -26,6 +28,9 @@ const zinferInsteadOfZoutput = {
     schema: [],
   },
   create(context) {
+    if (/^schemas\.[cm]?[jt]sx?$/u.test(basename(context.filename))) {
+      return {};
+    }
     const zod = createZodImportState();
     return {
       ...zodImportVisitor(zod),

@@ -37,6 +37,11 @@ export interface AgentsReference {
   path: string;
 }
 
+interface StructuredSyntax {
+  prose: string;
+  skipFollowing: boolean;
+}
+
 const directivePattern =
   /^\s*(?:[#@]\s*sourceMappingURL|@(?:__NO_SIDE_EFFECTS__|license|preserve|ts-expect-error|ts-ignore|ts-nocheck)|c8\s|eslint[- ]|istanbul\s|oxlint-|prettier-|spdx-|webpack|\/\s*<reference)/iu;
 const legalPattern = /^\s*(?:copyright|licensed under|mit license)/iu;
@@ -66,7 +71,7 @@ function cleanJSDocLine(line: string): string {
   return line.replace(/^\s*\*?\s?/u, "");
 }
 
-function stripStructuredSyntax(line: string): { prose: string; skipFollowing: boolean } {
+function stripStructuredSyntax(line: string): StructuredSyntax {
   const trimmed = line.trim();
   if (trimmed.startsWith("```")) {
     return { prose: "", skipFollowing: false };

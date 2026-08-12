@@ -7,6 +7,7 @@
  * Does not flag: `defineTool({ input: z.strictObject({ query: z.string() }) })`, nested plain objects,
  * or response projections outside a tool definition.
  */
+import { astNodes } from "./ast-nodes.ts";
 import { correctionFromEdits, replaceNode } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
@@ -40,7 +41,7 @@ const toolInputNotStrict = {
       ...zodImportVisitor(zod),
       Property(rawNode) {
         const node = rawNode as AstNode;
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         if (
           isToolInputProperty(node, ancestors) &&
           zodRootConstructor(node.value as AstNode, zod.roots) === "object"

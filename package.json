@@ -26,7 +26,8 @@
     "dist/cli.js",
     "dist/plugin.js",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "type": "module",
   "main": "./dist/plugin.js",
@@ -52,6 +53,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
+    "@oxlint/plugins": "1.77.0",
     "jsonc-parser": "^3.3.1",
     "nypm": "^0.6.9"
   },

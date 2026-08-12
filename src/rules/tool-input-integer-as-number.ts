@@ -7,6 +7,7 @@
  * Does not flag: `pull_number: z.int()`, fractional fields such as `price: z.number()`, or number
  * fields in provider response schemas outside a tool input.
  */
+import { astNodes } from "./ast-nodes.ts";
 import { correctionFromEdits, replaceNode } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
@@ -58,7 +59,7 @@ const toolInputIntegerAsNumber = {
           return;
         }
 
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         const toolInput = ancestors.findLast(
           (ancestor) =>
             ancestor.type === "Property" &&

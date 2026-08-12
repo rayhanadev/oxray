@@ -6,6 +6,7 @@
  *
  * Does not flag: `refinedBase.extend({ extra: z.string() })` or a shape spread from an unrefined base.
  */
+import { astNodes } from "./ast-nodes.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
   chainHasMethod,
@@ -59,7 +60,7 @@ const shapeSpreadDropsRefinements = {
           return;
         }
 
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         const objectIndex = ancestors.findLastIndex(
           (ancestor) => ancestor.type === "ObjectExpression",
         );

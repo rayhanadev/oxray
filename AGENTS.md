@@ -106,6 +106,16 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 
 You must never disable or suppress lint rules.
 
+## Third-party rule evaluation
+
+- Reimplement selected external rule ideas with Oxlint's plugin API.
+- Do not vendor complete third-party rule collections.
+- Add rules only when they have clear evidence and low false-positive risk.
+- Keep cohesive types, constants, enums, errors, and tests near their owning feature.
+- Dedicated declaration files must contain only declarations that match their filename.
+- Keep `unknown` visible at unparsed boundaries. Do not ban safe boundary types.
+- Preserve string unions when they model a type-only closed set.
+
 ## Release versioning
 
 - Use patch changesets when you add, remove, or revise lint rules.

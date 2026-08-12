@@ -8,6 +8,7 @@
  * Does not flag: the same issue with `path: ["a"]` or a pathless string issue. It also permits broad
  * whole-object invariants such as “at least one of a, b, or c.”
  */
+import { astNodes } from "./ast-nodes.ts";
 import { correctionFromEdits, type TextEdit } from "./corrections.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
@@ -92,7 +93,7 @@ const crossFieldIssueWithoutPath = {
           return;
         }
 
-        const ancestors = context.sourceCode.getAncestors(rawNode) as unknown as AstNode[];
+        const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
         const refinement = enclosingRefinementCall(ancestors);
         const receiver = methodReceiver(refinement);
         const fields = refinement ? conditionFields(ancestors, refinement) : undefined;
