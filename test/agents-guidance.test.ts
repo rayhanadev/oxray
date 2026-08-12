@@ -7,7 +7,8 @@ describe("AGENTS.md guidance", () => {
     const first = mergeAgentsGuidance("");
 
     expect(first).toContain("<!-- oxray:comments:start -->");
-    expect(first).toContain("<!-- oxray:comments:start -->\n## Comments and documentation");
+    expect(first).toContain("<!-- oxray:comments:start -->\n## Error handling");
+    expect(first).toContain("Result.tryPromise");
     expect(first).toContain("## Comments and documentation");
     expect(first).toContain("## Responding to lint diagnostics");
     expect(first).toContain("`oxlint --fix-suggestions`");

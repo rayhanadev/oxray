@@ -11,6 +11,7 @@ export interface AstNode {
   alternate?: AstNode | null;
   argument?: AstNode;
   arguments?: AstNode[];
+  async?: boolean;
   block?: AstNode;
   type: string;
   body?: AstNode | AstNode[];
@@ -21,11 +22,14 @@ export interface AstNode {
   declaration?: AstNode | null;
   declarations?: AstNode[];
   decorators?: AstNode[];
+  delegate?: boolean;
   elements?: Array<AstNode | null>;
   discriminant?: AstNode;
   expression?: AstNode | boolean;
+  expressions?: AstNode[];
   exportKind?: string;
   finalizer?: AstNode | null;
+  generator?: boolean;
   handler?: AstNode | null;
   id?: AstNode | null;
   importKind?: string;

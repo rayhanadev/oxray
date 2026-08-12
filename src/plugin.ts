@@ -13,11 +13,19 @@ import errorsFileOrganization from "./rules/errors-file-organization.ts";
 import filenameMatchExport from "./rules/filename-match-export.ts";
 import jsonParseArgumentOfSafeparse from "./rules/json-parse-argument-of-safeparse.ts";
 import lintSuppressionRequiresReason from "./rules/lint-suppression-requires-reason.ts";
+import noAdHocResult from "./rules/no-ad-hoc-result.ts";
+import noAsyncResultTry from "./rules/no-async-result-try.ts";
 import noChainedTypeAssertions from "./rules/no-chained-type-assertions.ts";
 import noConditionalEmptyObjectSpread from "./rules/no-conditional-empty-object-spread.ts";
+import noErrorSentinel from "./rules/no-error-sentinel.ts";
 import noExportedFunctionExpressions from "./rules/no-exported-function-expressions.ts";
 import noJsonParseStringifyCodec from "./rules/no-json-parse-stringify-codec.ts";
 import noKnownValueWidening from "./rules/no-known-value-widening.ts";
+import noPromiseCatch from "./rules/no-promise-catch.ts";
+import noPromiseReject from "./rules/no-promise-reject.ts";
+import noResultUnwrap from "./rules/no-result-unwrap.ts";
+import noThrow from "./rules/no-throw.ts";
+import noTryCatch from "./rules/no-try-catch.ts";
 import noTypeErasure from "./rules/no-type-erasure.ts";
 import noTypeof from "./rules/no-typeof.ts";
 import noUnknownTypeAliases from "./rules/no-unknown-type-aliases.ts";
@@ -27,8 +35,11 @@ import noZodTypeErasure from "./rules/no-zod-type-erasure.ts";
 import numberIntMethod from "./rules/number-int-method.ts";
 import objectStrictMethod from "./rules/object-strict-method.ts";
 import optionalDefaultRedundant from "./rules/optional-default-redundant.ts";
+import preferResultAwait from "./rules/prefer-result-await.ts";
 import recordStringUnknown from "./rules/record-string-unknown.ts";
 import requireJsdocComments from "./rules/require-jsdoc-comments.ts";
+import requireResultGenReturn from "./rules/require-result-gen-return.ts";
+import requireTaggedError from "./rules/require-tagged-error.ts";
 import schemasFileOrganization from "./rules/schemas-file-organization.ts";
 import shapeSpreadDropsRefinements from "./rules/shape-spread-drops-refinements.ts";
 import throwingZodRefine from "./rules/throwing-zod-refine.ts";
@@ -38,6 +49,7 @@ import trimAfterStringConstraint from "./rules/trim-after-string-constraint.ts";
 import typesFileOrganization from "./rules/types-file-organization.ts";
 import type { OxlintRule } from "./rules/types.ts";
 import unionOfLiteralsToLiteralArray from "./rules/union-of-literals-to-literal-array.ts";
+import wrapThrowingApi from "./rules/wrap-throwing-api.ts";
 import zinferInsteadOfZoutput from "./rules/zinfer-instead-of-zoutput.ts";
 import zod3StringFormatMethod from "./rules/zod3-string-format-method.ts";
 import zodtypeAnnotationInsteadOfSatisfies from "./rules/zodtype-annotation-instead-of-satisfies.ts";
@@ -57,11 +69,19 @@ const rules = {
   "filename-match-export": filenameMatchExport,
   "json-parse-argument-of-safeparse": jsonParseArgumentOfSafeparse,
   "lint-suppression-requires-reason": lintSuppressionRequiresReason,
+  "no-ad-hoc-result": noAdHocResult,
+  "no-async-result-try": noAsyncResultTry,
   "no-chained-type-assertions": noChainedTypeAssertions,
   "no-conditional-empty-object-spread": noConditionalEmptyObjectSpread,
+  "no-error-sentinel": noErrorSentinel,
   "no-exported-function-expressions": noExportedFunctionExpressions,
   "no-json-parse-stringify-codec": noJsonParseStringifyCodec,
   "no-known-value-widening": noKnownValueWidening,
+  "no-promise-catch": noPromiseCatch,
+  "no-promise-reject": noPromiseReject,
+  "no-result-unwrap": noResultUnwrap,
+  "no-throw": noThrow,
+  "no-try-catch": noTryCatch,
   "no-type-erasure": noTypeErasure,
   "no-typeof": noTypeof,
   "no-unknown-type-aliases": noUnknownTypeAliases,
@@ -71,8 +91,11 @@ const rules = {
   "number-int-method": numberIntMethod,
   "object-strict-method": objectStrictMethod,
   "optional-default-redundant": optionalDefaultRedundant,
+  "prefer-result-await": preferResultAwait,
   "record-string-unknown": recordStringUnknown,
   "require-jsdoc-comments": requireJsdocComments,
+  "require-result-gen-return": requireResultGenReturn,
+  "require-tagged-error": requireTaggedError,
   "schemas-file-organization": schemasFileOrganization,
   "shape-spread-drops-refinements": shapeSpreadDropsRefinements,
   "throwing-zod-refine": throwingZodRefine,
@@ -85,6 +108,7 @@ const rules = {
   "zod3-string-format-method": zod3StringFormatMethod,
   "zodtype-annotation-instead-of-satisfies": zodtypeAnnotationInsteadOfSatisfies,
   "zodtype-t-generic-helper": zodtypeTGenericHelper,
+  "wrap-throwing-api": wrapThrowingApi,
 } satisfies Record<PersonalRuleName, OxlintRule>;
 
 const plugin = {

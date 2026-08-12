@@ -3,10 +3,28 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { personalRuleDefaults, personalRuleNames } from "../src/rule-names.ts";
+import {
+  betterResultRuleNames,
+  personalRuleDefaults,
+  personalRuleNames,
+  type PersonalRuleName,
+} from "../src/rule-names.ts";
 
 let fixtureDirectory: string;
 let fixtureNumber = 0;
+const betterResultRules = new Set<PersonalRuleName>(betterResultRuleNames);
+
+function ruleSettings(enabledBetterResultRules: readonly PersonalRuleName[] = []) {
+  const enabled = new Set(enabledBetterResultRules);
+  return Object.fromEntries(
+    personalRuleNames.map((ruleName) => [
+      `rayhanadev/${ruleName}`,
+      betterResultRules.has(ruleName) && !enabled.has(ruleName)
+        ? "off"
+        : personalRuleDefaults[ruleName],
+    ]),
+  );
+}
 
 beforeAll(async () => {
   fixtureDirectory = await mkdtemp(join(tmpdir(), "oxray-rule-test-"));
@@ -20,12 +38,7 @@ beforeAll(async () => {
             specifier: join(process.cwd(), "src/plugin.ts"),
           },
         ],
-        rules: Object.fromEntries(
-          personalRuleNames.map((ruleName) => [
-            `rayhanadev/${ruleName}`,
-            personalRuleDefaults[ruleName],
-          ]),
-        ),
+        rules: ruleSettings(),
       },
       null,
       2,
@@ -41,20 +54,48 @@ afterAll(async () => {
   await rm(fixtureDirectory, { recursive: true });
 });
 
+interface LintOptions {
+  filename?: string;
+  fixSuggestions?: boolean;
+  flags?: readonly string[];
+  rules?: readonly PersonalRuleName[];
+}
+
 async function lint(
   code: string,
-  options: { filename?: string; flags?: readonly string[] } = {},
+  options: LintOptions = {},
 ): Promise<{ code: string; exitCode: number; output: string }> {
   fixtureNumber += 1;
   const { filename, flags = [] } = options;
   const fixturePath = join(fixtureDirectory, filename ?? `fixture-${fixtureNumber}.ts`);
   await Bun.write(fixturePath, code);
+  let configPath = join(fixtureDirectory, ".oxlintrc.json");
+  if (options.rules && options.rules.length > 0) {
+    configPath = join(fixtureDirectory, `.oxlintrc-${fixtureNumber}.json`);
+    await Bun.write(
+      configPath,
+      JSON.stringify(
+        {
+          jsPlugins: [
+            {
+              name: "rayhanadev",
+              specifier: join(process.cwd(), "src/plugin.ts"),
+            },
+          ],
+          rules: ruleSettings(options.rules),
+        },
+        null,
+        2,
+      ),
+    );
+  }
   const child = Bun.spawn(
     [
       join(process.cwd(), "node_modules/.bin/oxlint"),
       "--config",
-      join(fixtureDirectory, ".oxlintrc.json"),
+      configPath,
       ...flags,
+      ...(options.fixSuggestions ? ["--fix-suggestions"] : []),
       fixturePath,
     ],
     { stderr: "pipe", stdout: "pipe" },
@@ -164,6 +205,274 @@ describe("no-typeof", () => {
       expect(result.output).toContain("rayhanadev(no-typeof)");
     });
   }
+});
+
+describe("better-result policy rules", () => {
+  test("blocks direct exception and Promise rejection control flow", async () => {
+    const result = await lint(
+      `
+function load() {
+  try {
+    return Promise.reject(new Error("missing"));
+  } catch (error) {
+    throw error;
+  }
+}
+request().catch(recover);
+request().then(use, recover);
+new Promise((resolve, reject) => reject(error));
+`,
+      {
+        rules: ["no-promise-catch", "no-promise-reject", "no-throw", "no-try-catch"],
+      },
+    );
+
+    expect(result.exitCode).toBe(1);
+    for (const ruleName of ["no-promise-catch", "no-promise-reject", "no-throw", "no-try-catch"]) {
+      expect(result.output).toContain(`rayhanadev(${ruleName})`);
+    }
+  });
+
+  test("allows cleanup and explicit panic without catch or throw syntax", async () => {
+    const result = await lint(
+      `
+import { panic } from "better-result";
+try {
+  use(resource);
+} finally {
+  close(resource);
+}
+if (broken) panic("Invariant failed", state);
+`,
+      { rules: ["no-throw", "no-try-catch"] },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(no-throw)");
+    expect(result.output).not.toContain("rayhanadev(no-try-catch)");
+  });
+
+  test("blocks mixed nullable sentinels but allows Boolean branches", async () => {
+    const result = await lint(
+      `
+function findUser(found) {
+  if (!found) return null;
+  return { id: "user-1" };
+}
+const findName = (found) => found ? "Ray" : undefined;
+const isReady = (ready) => ready ? true : false;
+`,
+      { rules: ["no-error-sentinel"] },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-error-sentinel)");
+  });
+
+  test("allows single-lane sentinels and isolated transport objects", async () => {
+    const result = await lint(
+      `
+function absent() {
+  return null;
+}
+function transport(value) {
+  return { ok: true, value };
+}
+const isReady = (ready) => ready ? true : false;
+`,
+      { rules: ["no-ad-hoc-result", "no-error-sentinel"] },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(no-ad-hoc-result)");
+    expect(result.output).not.toContain("rayhanadev(no-error-sentinel)");
+  });
+
+  test("blocks object and tuple result envelopes", async () => {
+    const result = await lint(
+      `
+function loadObject(found) {
+  if (found) return { ok: true, value: found };
+  return { ok: false, error: "missing" };
+}
+function loadTuple(found) {
+  return found ? [found, null] : [null, "missing"];
+}
+`,
+      { rules: ["no-ad-hoc-result"] },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-ad-hoc-result)");
+  });
+
+  test("requires TaggedError for expected failures", async () => {
+    const result = await lint(
+      `
+import { Result, TaggedError } from "better-result";
+class Missing extends Error {}
+class Invalid extends TaggedError("Invalid")<{ message: string }> {}
+Result.err("missing");
+Result.err(new Error("missing"));
+Result.err(new Invalid({ message: "invalid" }));
+function invalidReturn() { return new Error("missing"); }
+`,
+      { rules: ["require-tagged-error"] },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(require-tagged-error)");
+  });
+
+  test("blocks known Result unwrap assertions", async () => {
+    const result = await lint(
+      `
+import { Result as R } from "better-result";
+R.try(read).unwrap();
+R.unwrap(R.ok(1));
+unrelated.unwrap();
+`,
+      { rules: ["no-result-unwrap"] },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-result-unwrap)");
+  });
+
+  test("checks async construction and generator contracts", async () => {
+    const result = await lint(
+      `
+import * as Better from "better-result";
+Better.Result.try(async () => loadUser());
+Better.Result.try({ try: async () => loadUser(), catch: toError });
+Better.Result.gen(function* () {
+  return user;
+});
+Better.Result.gen(function* () {
+  consume(user);
+});
+Better.Result.gen(async function* () {
+  const user = yield* await loadUser();
+  return Better.Result.ok(user);
+});
+`,
+      {
+        rules: ["no-async-result-try", "prefer-result-await", "require-result-gen-return"],
+      },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(no-async-result-try)");
+    expect(result.output).toContain("rayhanadev(prefer-result-await)");
+    expect(result.output).toContain("rayhanadev(require-result-gen-return)");
+  });
+
+  test("ignores unrelated Result bindings", async () => {
+    const result = await lint(
+      `
+const Result = makeResultApi();
+Result.try(async () => load());
+Result.gen(function* () { return value; });
+Result.try(read).unwrap();
+`,
+      {
+        rules: ["no-async-result-try", "no-result-unwrap", "require-result-gen-return"],
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(");
+  });
+
+  test("requires Result boundaries around known throwing APIs", async () => {
+    const result = await lint(
+      `
+import { Result } from "better-result";
+import { readFile } from "node:fs/promises";
+import { z } from "zod/v4";
+
+Result.try(() => JSON.parse(input));
+Result.tryPromise(() => fetch(url));
+JSON.parse(input);
+fetch(url);
+Result.try(() => fetch(url));
+readFile(path);
+new URL(input);
+z.string().parse(input);
+Result.try(() => z.string().parse(input));
+import(moduleName);
+`,
+      { rules: ["wrap-throwing-api"] },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(wrap-throwing-api)");
+  });
+
+  test("accepts known APIs inside matching Result boundaries", async () => {
+    const result = await lint(
+      `
+import * as Better from "better-result";
+import { readFile } from "node:fs/promises";
+
+Better.Result.try({
+  try: () => JSON.parse(input),
+  catch: toParseError,
+});
+Better.Result.try({
+  try: () => new URL(input),
+  catch: toUrlError,
+});
+Better.Result.tryPromise({
+  try: () => fetch(url),
+  catch: toNetworkError,
+});
+Better.Result.tryPromise({
+  try: () => readFile(path, "utf8"),
+  catch: toFileError,
+});
+Better.Result.tryPromise({
+  try: () => response.json(),
+  catch: toResponseError,
+});
+`,
+      { rules: ["wrap-throwing-api"] },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("rayhanadev(wrap-throwing-api)");
+  });
+
+  test("applies local better-result suggestions", async () => {
+    const asyncTry = await lint(
+      `
+import { Result } from "better-result";
+const response = Result.try(async () => fetch(url));
+`,
+      { fixSuggestions: true, rules: ["no-async-result-try"] },
+    );
+    const generatorReturn = await lint(
+      `
+import { Result as R } from "better-result";
+const result = R.gen(function* () { return value; });
+`,
+      { fixSuggestions: true, rules: ["require-result-gen-return"] },
+    );
+    const resultAwait = await lint(
+      `
+import { Result } from "better-result";
+const result = Result.gen(async function* () {
+  const user = yield* await loadUser();
+  return Result.ok(user);
+});
+`,
+      { fixSuggestions: true, rules: ["prefer-result-await"] },
+    );
+
+    expect(asyncTry.code).toContain("Result.tryPromise(async");
+    expect(generatorReturn.code).toContain("return R.ok(value)");
+    expect(resultAwait.code).toContain("yield* Result.await(loadUser())");
+  });
 });
 
 describe("selected anti-slop rules", () => {
@@ -322,6 +631,7 @@ export default (() => {});
 
 describe("Zod 4 rules", () => {
   const nonZodRuleNames = new Set([
+    ...betterResultRuleNames,
     "comment-explains-why",
     "comment-ste100",
     "comment-ste100-heuristics",
@@ -394,6 +704,7 @@ defineTool({
 
   test("accepts canonical forms and catalog exclusions", async () => {
     const result = await lint(`
+import { Result } from "better-result";
 import { z } from "zod/v4";
 type User = { id: string };
 
@@ -408,7 +719,7 @@ z.union([z.literal(1), z.literal("two")]);
 type Parsed = z.output<typeof schema>;
 const checked = z.object({ id: z.string() }) satisfies z.ZodType<User>;
 function parseWith<S extends z.ZodType>(schema: S): z.output<S> { return schema.parse(value); }
-try { schema.safeParse(JSON.parse(text)); } catch {}
+Result.try(() => schema.safeParse(JSON.parse(text)));
 z.json();
 z.strictObject({ id: z.string() });
 z.custom<User>(isUser);
@@ -417,11 +728,11 @@ z.codec(z.iso.datetime(), z.date(), {
   encode: (value) => value.toISOString(),
 });
 z.string().refine((value) => {
-  try { return new URL(value).hostname.length > 0; } catch { return false; }
+  return Result.try(() => new URL(value).hostname.length > 0).unwrapOr(false);
 });
 try {
   z.string().refine((value) => {
-    try { return JSON.parse(value) !== null; } catch { return false; }
+    return Result.try(() => JSON.parse(value)).isOk();
   });
 } catch {}
 z.strictObject({ a: z.string(), b: z.string() }).superRefine((value, ctx) => {
@@ -456,7 +767,7 @@ function schemaFor<T>(): z.ZodType<T> { return value; }
     }
   });
 
-  test("requires try/catch inside the refinement callback", async () => {
+  test("requires a Result boundary inside the refinement callback", async () => {
     const result = await lint(`
 import { z } from "zod/v4";
 try {
@@ -474,6 +785,20 @@ z.string()
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain("rayhanadev(throwing-zod-refine)");
+  });
+
+  test("requires Result.try around JSON parsing even inside try/catch", async () => {
+    const result = await lint(`
+import { z } from "zod/v4";
+try {
+  z.string().safeParse(JSON.parse(text));
+} catch {}
+`);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("rayhanadev(json-parse-argument-of-safeparse)");
+    expect(result.output).toContain("Capture JSON.parse with Result.try");
+    expect(result.output).not.toContain("JSON codec");
   });
 
   test("recognizes earlier aborting refinement guards", async () => {
@@ -726,6 +1051,7 @@ const userSchema: schema.ZodType<User> = schema.object({ id: schema.string() });
 
   test("reserves behavior-changing corrections for --fix-suggestions", async () => {
     const source = `
+import { Result } from "better-result";
 import { z } from "zod/v4";
 defineTool({
   input: z.object({
@@ -755,7 +1081,7 @@ z.string().refine((value) => new URL(value).hostname.length > 0);
       'ctx.addIssue({ path: ["name"], code: "custom", message: "name is required" })',
     );
     expect(suggestedResult.code).toContain(
-      "(value) => { try { return new URL(value).hostname.length > 0; } catch { return false; } }",
+      "(value) => Result.try(() => new URL(value).hostname.length > 0).unwrapOr(false)",
     );
   });
 });

@@ -6,11 +6,17 @@
  *
  * Flags: `z.string().refine((value) => new URL(value).protocol === "https:")`
  *
- * Does not flag: an operation inside a callback `try/catch` or after an aborting format check. It
- * also permits a guarded `z.stringFormat()` predicate. A `try` around schema construction does not
- * protect the callback.
+ * Does not flag: an operation inside callback `Result.try` or after an aborting format check. It
+ * also permits a guarded `z.stringFormat()` predicate. An outer boundary does not protect the
+ * deferred callback.
  */
 import { astNodes } from "./ast-nodes.ts";
+import {
+  collectBetterResultImports,
+  createBetterResultImportState,
+  enclosingResultBoundaryMethod,
+  type BetterResultImportState,
+} from "./better-result-ast.ts";
 import {
   correctionFromEdits,
   replaceNode,
@@ -21,16 +27,15 @@ import type { AstNode, OxlintReportNode, OxlintRule } from "./types.ts";
 import {
   astSubtreeSome,
   calleeName,
+  collectZodImports,
   createZodImportState,
   enclosingRefinementCall,
   isIdentifierMember,
   isFunctionNode,
-  isInsideTryBlock,
   memberName,
   methodReceiver,
   propertyName,
   unwrapExpression,
-  zodImportVisitor,
 } from "./zod-ast.ts";
 
 const throwingGlobalCalls = new Set(["BigInt", "decodeURIComponent"]);
@@ -92,14 +97,17 @@ function hasEarlierAbortingUrlGuard(node: AstNode | null | undefined): boolean {
   return hasEarlierAbortingUrlGuard(methodReceiver(current));
 }
 
-function isUnprotectedRefinement(ancestors: readonly AstNode[], acceptsUrlGuard = false): boolean {
+function isUnprotectedRefinement(
+  ancestors: readonly AstNode[],
+  betterResult: BetterResultImportState,
+  acceptsUrlGuard = false,
+): boolean {
   const refinement = enclosingRefinementCall(ancestors);
   if (!refinement) {
     return false;
   }
-  const refinementIndex = ancestors.indexOf(refinement);
   return (
-    !isInsideTryBlock(ancestors.slice(refinementIndex + 1)) &&
+    enclosingResultBoundaryMethod(ancestors, betterResult) === undefined &&
     (!acceptsUrlGuard || !hasEarlierAbortingUrlGuard(methodReceiver(refinement)))
   );
 }
@@ -107,6 +115,7 @@ function isUnprotectedRefinement(ancestors: readonly AstNode[], acceptsUrlGuard 
 function expressionRefinementCorrection(
   sourceText: string,
   ancestors: readonly AstNode[],
+  betterResult: BetterResultImportState,
 ): Correction | undefined {
   const refinement = enclosingRefinementCall(ancestors);
   if (!refinement || memberName(refinement.callee) !== "refine") {
@@ -126,8 +135,17 @@ function expressionRefinementCorrection(
   if (bodyText === undefined) {
     return undefined;
   }
+  const resultRoot =
+    betterResult.results.size === 1 && betterResult.namespaces.size === 0
+      ? [...betterResult.results][0]
+      : betterResult.namespaces.size === 1 && betterResult.results.size === 0
+        ? `${[...betterResult.namespaces][0]}.Result`
+        : undefined;
+  if (resultRoot === undefined) {
+    return undefined;
+  }
   return correctionFromEdits(sourceText, callback, [
-    replaceNode(body, `{ try { return ${bodyText}; } catch { return false; } }`),
+    replaceNode(body, `${resultRoot}.try(() => ${bodyText}).unwrapOr(false)`),
   ]);
 }
 
@@ -140,17 +158,22 @@ const throwingZodRefine = {
     hasSuggestions: true,
     messages: {
       mustNotThrow:
-        "This operation can throw outside Zod's safeParse contract. Catch it inside the refinement and return false, or establish an earlier aborting schema check.",
+        "Zod refinement callbacks must not throw. Use Result.try(...), a non-throwing guard, or an aborting schema check.",
       mustNotThrowWithSuggestion:
-        "This operation can throw outside Zod's safeParse contract. Replace the callback with `{{replacement}}` so an exception becomes a failed refinement.",
-      wrapRefinement: "Catch exceptions inside this refinement callback.",
+        "This operation can throw outside Zod's safeParse contract. Replace the callback with `{{replacement}}` so Result captures the exception.",
+      wrapRefinement: "Capture this exception with Result.try(...).",
     },
     schema: [],
   },
   create(context) {
+    const betterResult = createBetterResultImportState();
     const zod = createZodImportState();
     const report = (rawNode: OxlintReportNode, ancestors: readonly AstNode[]): void => {
-      const correction = expressionRefinementCorrection(context.sourceCode.text, ancestors);
+      const correction = expressionRefinementCorrection(
+        context.sourceCode.text,
+        ancestors,
+        betterResult,
+      );
       if (correction) {
         context.report({
           node: rawNode,
@@ -164,7 +187,11 @@ const throwingZodRefine = {
     };
 
     return {
-      ...zodImportVisitor(zod),
+      Program(rawNode) {
+        const node = rawNode as AstNode;
+        collectBetterResultImports(node, betterResult);
+        collectZodImports(node, zod);
+      },
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
         if (
@@ -172,7 +199,7 @@ const throwingZodRefine = {
           (throwingGlobalCalls.has(calleeName(node.callee) ?? "") || isJsonParse(node))
         ) {
           const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
-          if (isUnprotectedRefinement(ancestors)) {
+          if (isUnprotectedRefinement(ancestors, betterResult)) {
             report(rawNode, ancestors);
           }
         }
@@ -181,7 +208,7 @@ const throwingZodRefine = {
         const node = rawNode as AstNode;
         if (zod.roots.size > 0 && throwingNewExpressions.has(calleeName(node.callee) ?? "")) {
           const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
-          if (isUnprotectedRefinement(ancestors, calleeName(node.callee) === "URL")) {
+          if (isUnprotectedRefinement(ancestors, betterResult, calleeName(node.callee) === "URL")) {
             report(rawNode, ancestors);
           }
         }

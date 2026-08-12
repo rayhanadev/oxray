@@ -23,16 +23,33 @@ Oxray also works with npm, pnpm, and Yarn projects. It detects the project's pac
 
 Oxray:
 
-- Installs Oxlint, Oxfmt, type-aware linting, oxclippy, `@rayhanadev/ox`, and TypeScript 7.
+- Installs `better-result`, Oxlint, Oxfmt, type-aware linting, oxclippy, `@rayhanadev/ox`, and TypeScript 7.
 - Installs the matching Bun or Node.js type definitions.
 - Adds `lint` and `format` package scripts.
 - Creates or updates `.oxlintrc.json` and `.oxfmtrc.json` without replacing unrelated settings or JSONC comments.
 - Creates or updates an Oxray-owned section in `AGENTS.md` without replacing project guidance.
 - Enables the TypeScript, Unicorn, and Oxc lint plugins.
+- Requires Result-based failures and blocks throws, catch handlers, Promise rejection chains, failure sentinels, and hand-written result envelopes.
 - Enables comment and API documentation policy with advisory checks separated from blocking checks.
 - Enables import, `package.json`, and Tailwind CSS sorting.
 
 Running ox again with the same choices is safe and does not duplicate configuration.
+
+## Result-based failures
+
+Oxray installs [better-result](https://github.com/dmmulroy/better-result) 3 and requires expected failures to use `Result.err` with `TaggedError`.
+
+The blocking policy rejects:
+
+- `throw`, `try/catch`, `Promise.reject`, and `.catch()`.
+- Mixed success and nullable sentinel returns.
+- Hand-written object and tuple result envelopes.
+- Primitive errors and native `Error` subclasses for expected failures.
+- `Result.unwrap` and `.unwrap()`.
+- Incorrect asynchronous `Result.try` and `Result.gen` composition.
+- Known throwing or rejecting APIs outside `Result.try` or `Result.tryPromise`.
+
+Oxlint suggestions can replace asynchronous `Result.try`, bare `Result.gen` returns, and `yield* await` composition with their supported better-result forms.
 
 ## Lint corrections
 
