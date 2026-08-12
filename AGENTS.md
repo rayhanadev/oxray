@@ -106,6 +106,13 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 
 You must never disable or suppress lint rules.
 
+## Release versioning
+
+- Use patch changesets when you add, remove, or revise lint rules.
+- Use minor changesets when you add features or revise how Ox itself works.
+- Lint correction infrastructure is an Ox feature and requires a minor changeset.
+- Classify each changeset by its highest-impact change.
+
 <!-- oxray:comments:start -->
 ## Comments and documentation
 
