@@ -14,11 +14,19 @@ export const personalRuleDefaults = {
   "filename-match-export": "error",
   "json-parse-argument-of-safeparse": "error",
   "lint-suppression-requires-reason": "error",
+  "no-ad-hoc-result": "error",
+  "no-async-result-try": "error",
   "no-chained-type-assertions": "error",
   "no-conditional-empty-object-spread": "error",
+  "no-error-sentinel": "error",
   "no-exported-function-expressions": "error",
   "no-json-parse-stringify-codec": "error",
   "no-known-value-widening": "error",
+  "no-promise-catch": "error",
+  "no-promise-reject": "error",
+  "no-result-unwrap": "error",
+  "no-throw": "error",
+  "no-try-catch": "error",
   "no-type-erasure": "error",
   "no-typeof": "error",
   "no-unknown-type-aliases": "error",
@@ -28,8 +36,11 @@ export const personalRuleDefaults = {
   "number-int-method": "error",
   "object-strict-method": "error",
   "optional-default-redundant": "error",
+  "prefer-result-await": "error",
   "record-string-unknown": "error",
   "require-jsdoc-comments": "error",
+  "require-result-gen-return": "error",
+  "require-tagged-error": "error",
   "schemas-file-organization": "error",
   "shape-spread-drops-refinements": "error",
   "throwing-zod-refine": "error",
@@ -42,8 +53,24 @@ export const personalRuleDefaults = {
   "zod3-string-format-method": "error",
   "zodtype-annotation-instead-of-satisfies": "error",
   "zodtype-t-generic-helper": "error",
+  "wrap-throwing-api": "error",
 } as const;
 
 export type PersonalRuleName = keyof typeof personalRuleDefaults;
 
 export const personalRuleNames = Object.keys(personalRuleDefaults) as PersonalRuleName[];
+
+export const betterResultRuleNames = [
+  "no-ad-hoc-result",
+  "no-async-result-try",
+  "no-error-sentinel",
+  "no-promise-catch",
+  "no-promise-reject",
+  "no-result-unwrap",
+  "no-throw",
+  "no-try-catch",
+  "prefer-result-await",
+  "require-result-gen-return",
+  "require-tagged-error",
+  "wrap-throwing-api",
+] as const satisfies readonly PersonalRuleName[];

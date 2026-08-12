@@ -1,7 +1,13 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { addDevDependency, dlx, type PackageManager, type PackageManagerName } from "nypm";
+import {
+  addDependency,
+  addDevDependency,
+  dlx,
+  type PackageManager,
+  type PackageManagerName,
+} from "nypm";
 
 import packageJson from "../package.json" with { type: "json" };
 import { mergeAgentsGuidance } from "./agents-guidance.ts";
@@ -20,12 +26,14 @@ export interface ScaffoldOptions {
 }
 
 export interface ScaffoldOperations {
+  addDependency: typeof addDependency;
   addDevDependency: typeof addDevDependency;
   dlx: typeof dlx;
   loadOxclippyRules: typeof loadOxclippyRules;
 }
 
 const defaultScaffoldOperations: ScaffoldOperations = {
+  addDependency,
   addDevDependency,
   dlx,
   loadOxclippyRules,
@@ -71,6 +79,7 @@ export async function applyScaffold(
       ? "@types/bun@latest"
       : await resolveNodeTypesPackage(cwd, project.packageJson);
 
+  await operations.addDependency("better-result@^3", { cwd, packageManager });
   await operations.addDevDependency(
     [
       `${packageJson.name}@${packageJson.version}`,

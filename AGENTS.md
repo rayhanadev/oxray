@@ -124,6 +124,18 @@ You must never disable or suppress lint rules.
 - Classify each changeset by its highest-impact change.
 
 <!-- oxray:comments:start -->
+## Error handling
+
+- Return `Result.err` for expected failures that callers can handle.
+- Define expected failures with `TaggedError`.
+- Use `Result.try` for synchronous APIs that can throw.
+- Use `Result.tryPromise` for asynchronous APIs that can reject.
+- Use `Result.gen` and `Result.await` to compose fallible workflows.
+- Use `panic` for defects and failed invariants.
+- Do not use `throw`, `try/catch`, `Promise.reject`, or `.catch()`.
+- Do not return nullable failure sentinels or hand-written result envelopes.
+- Do not call `Result.unwrap` or `.unwrap()`.
+
 ## Comments and documentation
 
 - Use JSDoc for exported functions and classes.

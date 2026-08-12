@@ -4,17 +4,23 @@
  *
  * Flags: `schema.safeParse(JSON.parse(text))`
  *
- * Does not flag: calls inside `try` blocks or compile-time string literals that contain valid JSON.
+ * Does not flag: calls inside `Result.try` or compile-time string literals that contain valid JSON.
  */
+import { parse, type ParseError } from "jsonc-parser";
+
 import { astNodes } from "./ast-nodes.ts";
+import {
+  collectBetterResultImports,
+  createBetterResultImportState,
+  enclosingResultBoundaryMethod,
+} from "./better-result-ast.ts";
 import type { AstNode, OxlintRule } from "./types.ts";
 import {
+  collectZodImports,
   createZodImportState,
   isIdentifierMember,
-  isInsideTryBlock,
   isMethodCall,
   unwrapExpression,
-  zodImportVisitor,
 } from "./zod-ast.ts";
 
 function isJsonParse(node: AstNode | null | undefined): boolean {
@@ -29,12 +35,9 @@ function parsesKnownValidJson(node: AstNode | null | undefined): boolean {
   if (input?.type !== "Literal" || constructor !== String) {
     return false;
   }
-  try {
-    JSON.parse(input.value as string);
-    return true;
-  } catch {
-    return false;
-  }
+  const errors: ParseError[] = [];
+  parse(input.value as string, errors, { allowTrailingComma: false, disallowComments: true });
+  return errors.length === 0;
 }
 
 const jsonParseArgumentOfSafeparse = {
@@ -45,14 +48,19 @@ const jsonParseArgumentOfSafeparse = {
     },
     messages: {
       codec:
-        "safeParse cannot catch JSON.parse while its argument is evaluated. Parse at the I/O boundary, preserve failure explicitly, then validate the successful value.",
+        "safeParse cannot catch JSON.parse while its argument is evaluated. Capture JSON.parse with Result.try and validate only the successful value.",
     },
     schema: [],
   },
   create(context) {
+    const betterResult = createBetterResultImportState();
     const zod = createZodImportState();
     return {
-      ...zodImportVisitor(zod),
+      Program(rawNode) {
+        const node = rawNode as AstNode;
+        collectBetterResultImports(node, betterResult);
+        collectZodImports(node, zod);
+      },
       CallExpression(rawNode) {
         const node = rawNode as AstNode;
         if (
@@ -65,7 +73,7 @@ const jsonParseArgumentOfSafeparse = {
         }
 
         const ancestors = astNodes(context.sourceCode.getAncestors(rawNode));
-        if (!isInsideTryBlock(ancestors)) {
+        if (enclosingResultBoundaryMethod(ancestors, betterResult) === undefined) {
           context.report({ node: rawNode, messageId: "codec" });
         }
       },

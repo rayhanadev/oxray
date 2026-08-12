@@ -333,7 +333,7 @@ export function qualifiedTypeName(
 }
 
 /** Identifies function syntax that can act as a refinement callback. */
-export function isFunctionNode(node: AstNode | null | undefined): boolean {
+export function isFunctionNode(node: AstNode | null | undefined): node is AstNode {
   return (
     node?.type === "ArrowFunctionExpression" ||
     node?.type === "FunctionDeclaration" ||

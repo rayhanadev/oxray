@@ -28,8 +28,13 @@ describe("project scaffolding", () => {
   test("installs the toolchain, initializes configs, and remains idempotent", async () => {
     const directory = await temporaryProjects.create();
     const addedPackages: string[][] = [];
+    const addedRuntimePackages: string[][] = [];
     const initializedPackages: string[] = [];
     const operations: ScaffoldOperations = {
+      async addDependency(packageNames) {
+        addedRuntimePackages.push(Array.isArray(packageNames) ? packageNames : [packageNames]);
+        return {};
+      },
       async addDevDependency(packageNames) {
         addedPackages.push(Array.isArray(packageNames) ? packageNames : [packageNames]);
         return {};
@@ -53,6 +58,7 @@ describe("project scaffolding", () => {
 
     await applyScaffold(options, operations);
 
+    expect(addedRuntimePackages[0]).toEqual(["better-result@^3"]);
     expect(addedPackages[0]).toEqual([
       `${packageJson.name}@${packageJson.version}`,
       "oxlint@latest",
@@ -97,7 +103,8 @@ describe("project scaffolding", () => {
     expect(oxfmt.sortPackageJson).toBe(true);
     expect(oxfmt.sortTailwindcss).toBe(true);
     expect(firstPass[3]).toContain("<!-- oxray:comments:start -->");
-    expect(firstPass[3]).toContain("<!-- oxray:comments:start -->\n## Comments and documentation");
+    expect(firstPass[3]).toContain("<!-- oxray:comments:start -->\n## Error handling");
+    expect(firstPass[3]).toContain("Result.tryPromise");
     expect(await Bun.file(join(directory, "CLAUDE.md")).exists()).toBe(false);
 
     await applyScaffold(options, operations);
@@ -109,6 +116,7 @@ describe("project scaffolding", () => {
     ]);
 
     expect(secondPass).toEqual(firstPass);
+    expect(addedRuntimePackages).toEqual([["better-result@^3"], ["better-result@^3"]]);
     expect(initializedPackages).toEqual(["oxlint", "oxfmt"]);
   });
 });
