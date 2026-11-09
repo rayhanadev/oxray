@@ -18,6 +18,7 @@ export const personalRuleDefaults = {
   "no-async-result-try": "error",
   "no-chained-type-assertions": "error",
   "no-conditional-empty-object-spread": "error",
+  "no-disabled-bun-tests": "error",
   "no-error-sentinel": "error",
   "no-exported-function-expressions": "error",
   "no-json-parse-stringify-codec": "error",

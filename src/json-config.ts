@@ -156,12 +156,23 @@ export function mergeOxlintConfig(text: string, oxclippyRules: readonly RuleEntr
     next = setJsonValue(next, ["$schema"], "./node_modules/oxlint/configuration_schema.json");
   }
   const personalPlugin = { name: "rayhanadev", specifier: packageJson.name };
-  next = appendStrings(next, "plugins", config.plugins, ["typescript", "unicorn", "oxc"]);
+  next = appendStrings(next, "plugins", config.plugins, [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import",
+    "jest",
+    "vitest",
+  ]);
   next = appendJsPlugins(next, config.jsPlugins, ["oxclippy", personalPlugin]);
   next = setJsonValue(next, ["categories", "correctness"], "error");
   next = setJsonValue(next, ["options", "typeAware"], true);
   next = setJsonValue(next, ["options", "reportUnusedDisableDirectives"], "error");
   next = setJsonValue(next, ["env", "builtin"], true);
+  next = setJsonValue(next, ["rules", "import/no-cycle"], "error");
+  next = setJsonValue(next, ["rules", "import/no-mutable-exports"], "error");
+  next = setJsonValue(next, ["rules", "jest/no-disabled-tests"], "error");
+  next = setJsonValue(next, ["rules", "vitest/no-disabled-tests"], "error");
   for (const ruleName of personalRuleNames) {
     next = setJsonValue(next, ["rules", `rayhanadev/${ruleName}`], personalRuleDefaults[ruleName]);
   }

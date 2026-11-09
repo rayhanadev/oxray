@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc"],
+  "plugins": ["typescript", "unicorn", "oxc", "import", "jest", "vitest"],
   "categories": {
     "correctness": "error"
   },
@@ -13,6 +13,11 @@
   },
   "jsPlugins": ["./src/plugin.ts"],
   "rules": {
+    "import/no-cycle": "error",
+    "import/no-mutable-exports": "error",
+    "jest/no-disabled-tests": "error",
+    "vitest/no-disabled-tests": "error",
+    "rayhanadev/no-disabled-bun-tests": "error",
     "rayhanadev/comment-explains-why": "warn",
     "rayhanadev/comment-ste100": "error",
     "rayhanadev/comment-ste100-heuristics": "warn",

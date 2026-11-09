@@ -17,6 +17,7 @@ import noAdHocResult from "./rules/no-ad-hoc-result.ts";
 import noAsyncResultTry from "./rules/no-async-result-try.ts";
 import noChainedTypeAssertions from "./rules/no-chained-type-assertions.ts";
 import noConditionalEmptyObjectSpread from "./rules/no-conditional-empty-object-spread.ts";
+import noDisabledBunTests from "./rules/no-disabled-bun-tests.ts";
 import noErrorSentinel from "./rules/no-error-sentinel.ts";
 import noExportedFunctionExpressions from "./rules/no-exported-function-expressions.ts";
 import noJsonParseStringifyCodec from "./rules/no-json-parse-stringify-codec.ts";
@@ -73,6 +74,7 @@ const rules = {
   "no-async-result-try": noAsyncResultTry,
   "no-chained-type-assertions": noChainedTypeAssertions,
   "no-conditional-empty-object-spread": noConditionalEmptyObjectSpread,
+  "no-disabled-bun-tests": noDisabledBunTests,
   "no-error-sentinel": noErrorSentinel,
   "no-exported-function-expressions": noExportedFunctionExpressions,
   "no-json-parse-stringify-codec": noJsonParseStringifyCodec,
