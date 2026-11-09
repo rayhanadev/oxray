@@ -32,7 +32,8 @@ describe("JSONC config merging", () => {
   "plugins": ["react"],
   "jsPlugins": [{ "name": "local", "specifier": "./local.js" }],
   "rules": {
-    "eslint/no-console": "warn"
+    "eslint/no-console": "warn",
+    "no-restricted-imports": ["error", {"paths": ["stripe"]}]
   }
 }
 `;
@@ -43,7 +44,15 @@ describe("JSONC config merging", () => {
     const config = parse(merged);
 
     expect(merged).toContain("// keep this project note");
-    expect(config.plugins).toEqual(["react", "typescript", "unicorn", "oxc"]);
+    expect(config.plugins).toEqual([
+      "react",
+      "typescript",
+      "unicorn",
+      "oxc",
+      "import",
+      "jest",
+      "vitest",
+    ]);
     expect(config.jsPlugins).toEqual([
       { name: "local", specifier: "./local.js" },
       "oxclippy",
@@ -52,6 +61,11 @@ describe("JSONC config merging", () => {
     expect(config.categories.correctness).toBe("error");
     expect(config.options.typeAware).toBe(true);
     expect(config.rules["eslint/no-console"]).toBe("warn");
+    expect(config.rules["no-restricted-imports"]).toEqual(["error", { paths: ["stripe"] }]);
+    expect(config.rules["import/no-cycle"]).toBe("error");
+    expect(config.rules["import/no-mutable-exports"]).toBe("error");
+    expect(config.rules["jest/no-disabled-tests"]).toBe("error");
+    expect(config.rules["vitest/no-disabled-tests"]).toBe("error");
     for (const ruleName of personalRuleNames) {
       expect(config.rules[`rayhanadev/${ruleName}`]).toBe(personalRuleDefaults[ruleName]);
     }

@@ -112,6 +112,51 @@ async function lint(
   };
 }
 
+describe("no-disabled-bun-tests", () => {
+  test("reports named aliases, computed skips, namespaces, and parameterized suites", async () => {
+    const result = await lint(`
+import { test as check, it, describe } from "bun:test";
+import * as runner from "bun:test";
+check.skip("disabled", () => {});
+it["skip"]("disabled", () => {});
+describe.skip.each([1])("disabled %s", () => {});
+runner.test.skip("disabled", () => {});
+runner.describe["skip"]("disabled", () => {});
+`);
+    expect(result.exitCode).toBe(1);
+    expect(result.output.match(/This Bun test or suite is skipped/gu)).toHaveLength(5);
+  });
+
+  test("resolves imports regardless of declaration order", async () => {
+    const result = await lint(`
+check.skip("disabled", () => {});
+import { test as check } from "bun:test";
+`);
+    expect(result.output).toContain("This Bun test or suite is skipped");
+  });
+
+  test("allows active tests, conditional skips, todos, and unrelated or shadowed bindings", async () => {
+    const result = await lint(`
+import { test, describe } from "bun:test";
+import * as runner from "bun:test";
+import { test as other } from "./test-utils";
+test("active", () => {});
+describe("suite", () => {});
+test.skipIf(process.platform === "win32")("platform", () => {});
+test.todo("planned");
+runner.test("active", () => {});
+other.skip("custom", () => {});
+function local(test: { skip: (name: string) => void }) { test.skip("custom"); }
+function namespace(runner: { test: { skip: (name: string) => void } }) {
+  runner.test.skip("custom");
+}
+const skip = test.skip;
+`);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain("This Bun test or suite is skipped");
+  });
+});
+
 describe("no-type-erasure", () => {
   test("accepts concrete object shapes and domain-specific guards", async () => {
     const result = await lint(`
@@ -645,6 +690,7 @@ describe("Zod 4 rules", () => {
     "lint-suppression-requires-reason",
     "no-chained-type-assertions",
     "no-conditional-empty-object-spread",
+    "no-disabled-bun-tests",
     "no-exported-function-expressions",
     "no-known-value-widening",
     "no-type-erasure",

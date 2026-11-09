@@ -78,6 +78,47 @@ The organization rules do not force every declaration into a shared file.
 Feature modules can keep cohesive declarations beside their implementation.
 `schemas.ts` can colocate only `z.infer<...>` aliases with schema constants.
 
+## Architecture checks
+
+Oxray applies selected checks inspired by [untangle-codebase](https://github.com/caldoai/skills/blob/main/skills/untangle-codebase/SKILL.md):
+
+- `import/no-cycle` rejects dependency cycles. Its default configuration ignores type-only imports.
+- `import/no-mutable-exports` rejects exported `let` and `var` bindings. It does not freeze exported objects.
+- Jest and Vitest's `no-disabled-tests` rules reject disabled tests for those runners.
+- `rayhanadev/no-disabled-bun-tests` rejects unconditional `.skip()` calls on imported Bun tests and suites.
+
+The Bun rule recognizes named aliases, namespace imports, computed `"skip"` properties, and `skip.each` chains.
+It permits `skipIf`, `todo`, and shadowed bindings. It does not follow assigned aliases such as `const skipped = test.skip`.
+These checks do not remove tests or rewrite module APIs automatically.
+
+Configure feature boundaries with Oxlint's `no-restricted-imports`. Oxray preserves project rules and overrides during setup:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["src/domain/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/adapters/**", "@/adapters/**"],
+                "message": "Domain code must depend on a port owned by the domain."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Match every import spelling your project uses, including aliases. Static import restrictions cannot prevent computed runtime loading.
+Duplication, change frequency, feature colocation, and test quality still require architecture review.
+
 ## Oxclippy presets
 
 Choose how much of oxclippy to enable during setup:
